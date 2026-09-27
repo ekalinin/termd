@@ -1,0 +1,26 @@
+[1m# Paragraphs and headings[0m
+
+A paragraph that is long enough to be
+wrapped at every tested width, so the
+golden files show how words move to the
+next line without ever exceeding the
+output width.
+
+[1m## Mixed scripts[0m
+
+Кириллица занимает одну колонку на
+букву, а 日本語テキスト занимает две
+колонки на каждый иероглиф, и перенос
+это учитывает.
+
+[1m### A very long word[0m
+
+Supercalifragilisticexpialidocious-and-t
+hen-some-more-characters-to-exceed-forty
+-columns-and-sixty-columns-too ends
+here.
+
+[1m#### Hard line break[0m
+
+First line with a hard break
+second line after the break.

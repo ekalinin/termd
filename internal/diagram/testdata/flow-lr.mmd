@@ -1,0 +1,9 @@
+flowchart LR
+    subgraph Parse
+        A[Markdown] --> B[AST]
+    end
+    B --> C{Mermaid?}
+    C -->|yes| D[Diagram]
+    C -->|no| E[Text]
+    D --> F[Output]
+    E --> F

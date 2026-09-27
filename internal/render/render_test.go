@@ -1,0 +1,258 @@
+package render
+
+import (
+	"regexp"
+	"strings"
+	"testing"
+
+	"github.com/yuin/goldmark/ast"
+	east "github.com/yuin/goldmark/extension/ast"
+
+	"github.com/ekalinin/termd/internal/highlight"
+	"github.com/ekalinin/termd/internal/style"
+	"github.com/ekalinin/termd/internal/text"
+)
+
+func plain(width int) Options {
+	return Options{Width: width}
+}
+
+func styled(width int) Options {
+	return Options{
+		Width: width,
+		Style: style.Options{Styled: true, Hyperlinks: true, Depth: style.TrueColor},
+		Theme: func() highlight.Theme { return highlight.Dark },
+	}
+}
+
+var escRE = regexp.MustCompile(`\x1b\[[0-9;]*m|\x1b\]8;;[^\x1b]*\x1b\\`)
+
+func stripEscapes(s string) string {
+	return escRE.ReplaceAllString(s, "")
+}
+
+func renderLines(src string, opts Options) []string {
+	return strings.Split(strings.TrimSuffix(Render([]byte(src), opts), "\n"), "\n")
+}
+
+func TestParseGFM(t *testing.T) {
+	src := "| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~text~~ https://example.com\n"
+	found := map[string]bool{}
+	_ = ast.Walk(Parse([]byte(src)), func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering {
+			switch n.(type) {
+			case *east.Table:
+				found["table"] = true
+			case *east.TaskCheckBox:
+				found["task"] = true
+			case *east.Strikethrough:
+				found["strikethrough"] = true
+			case *ast.AutoLink:
+				found["autolink"] = true
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+	for _, k := range []string{"table", "task", "strikethrough", "autolink"} {
+		if !found[k] {
+			t.Errorf("no %s node in the AST", k)
+		}
+	}
+}
+
+func TestParagraphWrapping(t *testing.T) {
+	para := strings.Repeat("word ", 50)
+	for _, l := range renderLines(para, plain(40)) {
+		if w := text.Width(l); w > 40 {
+			t.Errorf("line %q is %d wide", l, w)
+		}
+	}
+	long := strings.Repeat("x", 120)
+	got := renderLines(long, plain(80))
+	if len(got) != 2 || len(got[0]) != 80 || len(got[1]) != 40 {
+		t.Errorf("120-character word at width 80 rendered as %q", got)
+	}
+}
+
+func TestHeadings(t *testing.T) {
+	got := renderLines("# Title\n\n### Section\n", plain(80))
+	want := []string{"# Title", "", "### Section"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	out := Render([]byte("# Title\n"), styled(80))
+	if !strings.Contains(out, "\x1b[1m# Title") {
+		t.Errorf("heading is not bold: %q", out)
+	}
+}
+
+func TestInlineFormatting(t *testing.T) {
+	src := "**bold** *italic* ~~gone~~ `code`\n"
+	if got := renderLines(src, plain(80))[0]; got != "bold italic gone code" {
+		t.Errorf("plain output = %q", got)
+	}
+	out := Render([]byte(src), styled(80))
+	for _, seq := range []string{"\x1b[1mbold", "\x1b[3mitalic", "\x1b[9mgone", "\x1b[36mcode"} {
+		if !strings.Contains(out, seq) {
+			t.Errorf("styled output %q lacks %q", out, seq)
+		}
+	}
+	if strings.ContainsAny(stripEscapes(out), "*~`") {
+		t.Errorf("styled output keeps markdown markers: %q", stripEscapes(out))
+	}
+}
+
+func TestPlainOutputHasNoEscapes(t *testing.T) {
+	src := "# H\n\n**b** [l](https://x.y) `c`\n\n```go\nfunc main() {}\n```\n"
+	if out := Render([]byte(src), plain(80)); strings.ContainsRune(out, 0x1b) {
+		t.Errorf("plain output contains ESC: %q", out)
+	}
+}
+
+func TestListContinuationAlignment(t *testing.T) {
+	src := "- a list item that is long enough to wrap onto more lines\n"
+	got := renderLines(src, plain(20))
+	if !strings.HasPrefix(got[0], "• ") {
+		t.Fatalf("first line %q has no bullet", got[0])
+	}
+	for _, l := range got[1:] {
+		if !strings.HasPrefix(l, "  ") || strings.HasPrefix(l, "   ") {
+			t.Errorf("continuation line %q is not aligned to the item text", l)
+		}
+	}
+}
+
+func TestNestedAndTaskLists(t *testing.T) {
+	got := renderLines("- parent\n  - child\n- [ ] todo\n- [x] done\n", plain(80))
+	want := []string{"• parent", "  • child", "• [ ] todo", "• [x] done"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestBlockQuoteMarker(t *testing.T) {
+	src := "> " + strings.Repeat("quoted words ", 12) + "\n"
+	got := renderLines(src, plain(30))
+	if len(got) < 3 {
+		t.Fatalf("quote did not wrap: %q", got)
+	}
+	for _, l := range got {
+		if !strings.HasPrefix(l, "│ ") || text.Width(l) > 30 {
+			t.Errorf("quote line %q", l)
+		}
+	}
+}
+
+func TestCodeBlockWhitespace(t *testing.T) {
+	code := "  two  spaces\n\tone tab\n    four"
+	got := renderLines("```\n"+code+"\n```\n", plain(80))
+	if strings.Join(got, "\n") != code {
+		t.Errorf("got %q, want %q", strings.Join(got, "\n"), code)
+	}
+}
+
+func TestThematicBreak(t *testing.T) {
+	got := renderLines("a\n\n---\n\nb\n", plain(33))
+	if got[2] != strings.Repeat("─", 33) {
+		t.Errorf("break = %q", got[2])
+	}
+}
+
+func TestImagesAndHTML(t *testing.T) {
+	got := Render([]byte("![architecture](docs/arch.png)\n\n<details><summary>More</summary>text</details>\n"), plain(80))
+	if !strings.Contains(got, "[image: architecture] (docs/arch.png)") {
+		t.Errorf("image not rendered: %q", got)
+	}
+	if !strings.Contains(got, "<details><summary>More</summary>text</details>") {
+		t.Errorf("raw HTML not kept: %q", got)
+	}
+}
+
+func TestWideBlockIsNotTruncated(t *testing.T) {
+	wide := strings.Repeat("0123456789", 12)
+	got := renderLines("```\n"+wide+"\n```\n", plain(80))
+	if len(got) != 1 || got[0] != wide {
+		t.Errorf("wide code line changed: %q", got)
+	}
+	r := &renderer{src: []byte("```\n" + wide + "\n```\n"), opts: plain(80)}
+	blocks := r.blocks(Parse(r.src), 80)
+	if len(blocks) != 1 || !blocks[0].Wide {
+		t.Errorf("code block wider than the output is not marked wide")
+	}
+}
+
+func TestCodeWithoutKnownLanguageIsUncolored(t *testing.T) {
+	for _, src := range []string{"```\nx := 1\n```\n", "```foo\nx := 1\n```\n", "    x := 1\n"} {
+		out := Render([]byte(src), styled(80))
+		if strings.ContainsRune(out, 0x1b) {
+			t.Errorf("%q rendered with escapes: %q", src, out)
+		}
+	}
+	if out := Render([]byte("```go\nfunc main() {}\n```\n"), styled(80)); !strings.Contains(out, "\x1b[") {
+		t.Errorf("go block is not highlighted: %q", out)
+	}
+}
+
+func TestThemeIsResolvedOnlyWhenNeeded(t *testing.T) {
+	tests := []struct {
+		name  string
+		src   string
+		opts  func(Options) Options
+		calls int
+	}{
+		{"no code", "# Title\n\ntext\n", nil, 0},
+		{"unknown language", "```foo\nx\n```\n", nil, 0},
+		{"diagram only", "```mermaid\ngraph TD\nA-->B\n```\n", nil, 0},
+		{"two go blocks", "```go\na\n```\n\n```go\nb\n```\n", nil, 1},
+		{"plain mode", "```go\na\n```\n", func(o Options) Options { o.Style.Styled = false; return o }, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			opts := styled(80)
+			opts.Theme = func() highlight.Theme { calls++; return highlight.Dark }
+			if tt.opts != nil {
+				opts = tt.opts(opts)
+			}
+			Render([]byte(tt.src), opts)
+			if calls != tt.calls {
+				t.Errorf("theme resolved %d times, want %d", calls, tt.calls)
+			}
+		})
+	}
+}
+
+func TestHyperlinks(t *testing.T) {
+	url := "https://example.com/very/long/path"
+	src := "[docs](" + url + ")\n"
+	out := Render([]byte(src), styled(80))
+	if stripEscapes(strings.TrimSpace(out)) != "docs" || !strings.Contains(out, "\x1b]8;;"+url+"\x1b\\") {
+		t.Errorf("styled link = %q", out)
+	}
+	if got := renderLines(src, plain(80))[0]; got != "docs ("+url+")" {
+		t.Errorf("plain link = %q", got)
+	}
+	if got := renderLines("https://example.com\n", plain(80))[0]; got != "https://example.com" {
+		t.Errorf("autolink = %q", got)
+	}
+}
+
+func TestTableCells(t *testing.T) {
+	url := "https://example.com/very/long/path/to/documentation/page"
+	src := "| Ссылка | Код |\n|---|---|\n| [docs](" + url + ") | `code \\| pipe` |\n"
+	out := Render([]byte(src), styled(80))
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("got %d lines: %q", len(lines), lines)
+	}
+	row := stripEscapes(lines[2])
+	if row != "docs   │ code | pipe" {
+		t.Errorf("row = %q", row)
+	}
+	if !strings.Contains(lines[2], "\x1b]8;;"+url+"\x1b\\") {
+		t.Errorf("row has no hyperlink: %q", lines[2])
+	}
+	if strings.Count(stripEscapes(lines[0]), "│") != 1 {
+		t.Errorf("escaped pipe changed the number of columns: %q", lines[0])
+	}
+}

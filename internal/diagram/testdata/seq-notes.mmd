@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    Note left of C: waits
+    Note right of A: проверка токена
+    C->>A: request
+    Note over A: validates
+    Note over C,A: shared note

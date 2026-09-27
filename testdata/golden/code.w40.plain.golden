@@ -1,0 +1,33 @@
+# Code
+
+package main
+
+import "fmt"
+
+// main prints a greeting.
+func main() {
+	fmt.Println("hello, world") // tab-indented
+}
+
+def greet(name: str) -> str:
+    """Return a greeting."""
+    return f"hello, {name}"  # comment
+
+#!/bin/sh
+echo "hello" | tr a-z A-Z   # upper-case
+
+unknown language   keeps   spaces
+
+no info string
+
+indented code block
+    with more indentation
+
+a code line that is wider than eighty columns: 0123456789012345678901234567890123456789012345678901234567890123456789
+
+────────────────────────────────────────
+
+<details>
+<summary>More</summary>
+text
+</details>

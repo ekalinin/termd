@@ -1,0 +1,9 @@
+# Inline formatting
+
+Text with **bold**, *italic*, ~~gone~~ and `code` spans, plus ***both*** at once.
+
+A [link](https://example.com/very/long/path/to/documentation/page) inside a sentence, a bare URL https://example.com and an email <user@example.com>.
+
+An image ![architecture](docs/arch.png) and inline <kbd>Ctrl</kbd> HTML.
+
+Escaped \*stars\* and an entity &amp; stay literal.

@@ -1,0 +1,16 @@
+# Paragraphs and headings
+
+A paragraph that is long enough to be wrapped at every tested width, so the golden files show how words move to the next line without ever exceeding the output width.
+
+## Mixed scripts
+
+Кириллица занимает одну колонку на букву, а 日本語テキスト занимает две колонки на каждый иероглиф, и перенос это учитывает.
+
+### A very long word
+
+Supercalifragilisticexpialidocious-and-then-some-more-characters-to-exceed-forty-columns-and-sixty-columns-too ends here.
+
+#### Hard line break
+
+First line with a hard break  
+second line after the break.

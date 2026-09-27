@@ -1,0 +1,24 @@
+# Diagrams
+
+┌────────┐     ┌─────┐
+│ Client │     │ API │
+└────┬───┘     └──┬──┘
+     │            │
+     │ GET /doc   │
+     ├───────────►│
+     │            ┃
+     │            ┃ ┌─────────────────┐
+     │            ┃ │ проверка токена │
+     │            ┃ └─────────────────┘
+     │            ┃
+     │ 200 OK     ┃
+     │◄┈┈┈┈┈┈┈┈┈┈┈┨
+     │            │
+
+┌─ mermaid - stateDiagram-v2 - not supported ┐
+│ stateDiagram-v2                            │
+│     [*] --> Idle                           │
+│     Idle --> Loading: open                 │
+└────────────────────────────────────────────┘
+
+The paragraph after the diagrams is rendered normally.

@@ -1,0 +1,16 @@
+[1m# Quotes[0m
+
+[2m│ [0mA block quote that is long enough to
+[2m│ [0mbe wrapped, and every wrapped line has
+[2m│ [0mto keep the quote marker in front of
+[2m│ [0mit.
+[2m│[0m
+[2m│ [0mA second paragraph in the same quote.
+
+[2m│ [0mOuter quote
+[2m│[0m
+[2m│ │ [0mNested quote that is also long
+[2m│ │ [0menough to wrap at narrow widths.
+[2m│[0m
+[2m│ • [0ma list
+[2m│ • [0minside a quote

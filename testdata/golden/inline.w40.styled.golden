@@ -1,0 +1,14 @@
+[1m# Inline formatting[0m
+
+Text with [1mbold[0m, [3mitalic[0m, [9mgone[0m and [36mcode[0m
+spans, plus [1;3mboth[0m at once.
+
+A ]8;;https://example.com/very/long/path/to/documentation/page\[4;34mlink[0m]8;;\ inside a sentence, a bare URL
+]8;;https://example.com\[4;34mhttps://example.com[0m]8;;\ and an email
+]8;;mailto:user@example.com\[4;34muser@example.com[0m]8;;\.
+
+An image ]8;;docs/arch.png\[4;34m[image: architecture][0m]8;;\ and
+inline <kbd>Ctrl</kbd> HTML.
+
+Escaped *stars* and an entity & stay
+literal.

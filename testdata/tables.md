@@ -1,0 +1,29 @@
+# Tables
+
+## Parameters
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `--width` | int | 80 | Максимальная ширина вывода в колонках терминала, после которой текст переносится |
+| `--theme` | string | auto | Цветовая тема: dark, light, auto, или путь к JSON-файлу с темой |
+
+## Inline content, emoji, CJK, alignment
+
+| Статус | Имя | Ссылка | Число |
+|:---:|---|---|---:|
+| ✅ | **жирный** | [docs](https://example.com/very/long/path/to/documentation/page) | 1 |
+| ⚠️ | 日本語テキスト | `code \| pipe` | 1000 |
+| 👨‍👩‍👧 | обычный | - | 42 |
+
+## Ragged rows
+
+| a | b | c |
+|---|---|---|
+| 1 | 2 |
+| 1 | 2 | 3 | extra |
+
+## Overflow
+
+| alpha | bravo | charlie | delta | echo | foxtrot | golf | hotel | india | juliett | kilo | lima |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| alphabetical | bravissimo | charleston | deltaplane | echolocation | foxtrotting | golfcourse | hotelier | indianapolis | julietta | kilometre | limassol |

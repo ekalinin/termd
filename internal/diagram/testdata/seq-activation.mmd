@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    box Backend
+    participant A as API
+    participant D as DB
+    end
+    actor U as Пользователь
+    U->>+A: call
+    A->>D: query
+    activate D
+    D-->>A: rows
+    deactivate D
+    A-->>-U: result
+    U-)A: async
+    U-xA: lost

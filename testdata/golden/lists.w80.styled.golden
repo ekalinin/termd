@@ -1,0 +1,20 @@
+[1m# Lists[0m
+
+[2m• [0mA short item
+[2m• [0mA list item that is long enough to wrap onto a second line at width forty and
+  sixty
+  [2m• [0mA nested item that also needs to wrap because it is quite long indeed
+  [2m• [0mNested short
+[2m• [0mLast item
+
+[2m 9. [0mNinth item
+[2m10. [0mTenth item that is long enough to wrap onto the next line at narrow widths
+
+[2m• [0m[ ] todo
+[2m• [0m[x] done
+
+Loose list:
+
+[2m• [0mFirst paragraph item.
+
+[2m• [0mSecond paragraph item.

@@ -1,0 +1,4 @@
+┌─ mermaid - sequenceDiagram - parse error: line 2: invalid syntax: "A->>: missing target" ┐
+│ sequenceDiagram                                                                          │
+│     A->>: missing target                                                                 │
+└──────────────────────────────────────────────────────────────────────────────────────────┘

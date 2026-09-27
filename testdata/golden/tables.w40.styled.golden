@@ -1,0 +1,44 @@
+[1m# Tables[0m
+
+[1m## Parameters[0m
+
+[1mПараметр[0m │ [1mТип[0m    │ [1mПо[0m        │ [1mОписание[0m
+         │        │ [1mумолчанию[0m │
+─────────┼────────┼───────────┼─────────────
+[36m--width[0m  │ int    │ 80        │ Максимальная
+         │        │           │ ширина
+         │        │           │ вывода в
+         │        │           │ колонках
+         │        │           │ терминала,
+         │        │           │ после
+         │        │           │ которой
+         │        │           │ текст
+         │        │           │ переносится
+[36m--theme[0m  │ string │ auto      │ Цветовая
+         │        │           │ тема: dark,
+         │        │           │ light, auto,
+         │        │           │ или путь к
+         │        │           │ JSON-файлу с
+         │        │           │ темой
+
+[1m## Inline content, emoji, CJK, alignment[0m
+
+[1mСтатус[0m │ [1mИмя[0m            │ [1mСсылка[0m │ [1mЧисло[0m
+───────┼────────────────┼────────┼──────
+  ✅   │ [1mжирный[0m         │ ]8;;https://example.com/very/long/path/to/documentation/page\[4;34mdocs[0m]8;;\   │     1
+  ⚠️   │ 日本語テキスト │ [36mcode |[0m │  1000
+       │                │ [36mpipe[0m   │
+  👨‍👩‍👧   │ обычный        │ -      │    42
+
+[1m## Ragged rows[0m
+
+[1ma[0m │ [1mb[0m │ [1mc[0m
+──┼───┼──
+1 │ 2 │
+1 │ 2 │ 3
+
+[1m## Overflow[0m
+
+[1malpha[0m        │ [1mbravo[0m      │ [1mcharlie[0m    │ [1mdelta[0m      │ [1mecho[0m         │ [1mfoxtrot[0m     │ [1mgolf[0m       │ [1mhotel[0m    │ [1mindia[0m        │ [1mjuliett[0m  │ [1mkilo[0m      │ [1mlima[0m
+─────────────┼────────────┼────────────┼────────────┼──────────────┼─────────────┼────────────┼──────────┼──────────────┼──────────┼───────────┼─────────
+alphabetical │ bravissimo │ charleston │ deltaplane │ echolocation │ foxtrotting │ golfcourse │ hotelier │ indianapolis │ julietta │ kilometre │ limassol

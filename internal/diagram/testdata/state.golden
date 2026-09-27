@@ -1,0 +1,5 @@
+┌─ mermaid - stateDiagram-v2 - not supported ┐
+│ stateDiagram-v2                            │
+│     [*] --> Idle                           │
+│     Idle --> Loading: open                 │
+└────────────────────────────────────────────┘

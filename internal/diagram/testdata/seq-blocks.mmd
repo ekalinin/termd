@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant D as DB
+    loop retry 3x
+        A->>D: SELECT doc
+        D-->>A: rows
+    end
+    alt found
+        A-->>C: 200 OK
+    else not found
+        A-->>C: 404
+    end
+    opt cache hit
+        A-->>C: cached
+    end
+    par parallel
+        A->>D: read
+    and
+        A->>D: audit
+    end
+    critical tx
+        A->>D: commit
+    end
+    break on error
+        A-->>C: 500
+    end
+    rect rgb(200,200,255)
+        A->>A: self check
+    end

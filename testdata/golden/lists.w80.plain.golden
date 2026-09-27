@@ -1,0 +1,20 @@
+# Lists
+
+• A short item
+• A list item that is long enough to wrap onto a second line at width forty and
+  sixty
+  • A nested item that also needs to wrap because it is quite long indeed
+  • Nested short
+• Last item
+
+ 9. Ninth item
+10. Tenth item that is long enough to wrap onto the next line at narrow widths
+
+• [ ] todo
+• [x] done
+
+Loose list:
+
+• First paragraph item.
+
+• Second paragraph item.

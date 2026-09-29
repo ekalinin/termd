@@ -1,0 +1,34 @@
+<span class="b"># Tables</span>
+
+<span class="b">## Parameters</span>
+
+<span class="b">Параметр</span> │ <span class="b">Тип</span>    │ <span class="b">По умолчанию</span> │ <span class="b">Описание</span>
+─────────┼────────┼──────────────┼──────────────────────────
+<span style="color:var(--ansi-36)">--width</span>  │ int    │ 80           │ Максимальная ширина
+         │        │              │ вывода в колонках
+         │        │              │ терминала, после которой
+         │        │              │ текст переносится
+<span style="color:var(--ansi-36)">--theme</span>  │ string │ auto         │ Цветовая тема: dark,
+         │        │              │ light, auto, или путь к
+         │        │              │ JSON-файлу с темой
+
+<span class="b">## Inline content, emoji, CJK, alignment</span>
+
+<span class="b">Статус</span> │ <span class="b">Имя</span>            │ <span class="b">Ссылка</span>      │ <span class="b">Число</span>
+───────┼────────────────┼─────────────┼──────
+  <span class="w">✅</span>   │ <span class="b">жирный</span>         │ <a href="https://example.com/very/long/path/to/documentation/page"><span class="u" style="color:var(--ansi-34)">docs</span></a>        │     1
+  <span class="w">⚠️</span>   │ <span class="w">日</span><span class="w">本</span><span class="w">語</span><span class="w">テ</span><span class="w">キ</span><span class="w">ス</span><span class="w">ト</span> │ <span style="color:var(--ansi-36)">code | pipe</span> │  1000
+  <span class="w">👨‍👩‍👧</span>   │ обычный        │ -           │    42
+
+<span class="b">## Ragged rows</span>
+
+<span class="b">a</span> │ <span class="b">b</span> │ <span class="b">c</span>
+──┼───┼──
+1 │ 2 │
+1 │ 2 │ 3
+
+<span class="b">## Overflow</span>
+
+<span class="b">alpha</span>        │ <span class="b">bravo</span>      │ <span class="b">charlie</span>    │ <span class="b">delta</span>      │ <span class="b">echo</span>         │ <span class="b">foxtrot</span>     │ <span class="b">golf</span>       │ <span class="b">hotel</span>    │ <span class="b">india</span>        │ <span class="b">juliett</span>  │ <span class="b">kilo</span>      │ <span class="b">lima</span>
+─────────────┼────────────┼────────────┼────────────┼──────────────┼─────────────┼────────────┼──────────┼──────────────┼──────────┼───────────┼─────────
+alphabetical │ bravissimo │ charleston │ deltaplane │ echolocation │ foxtrotting │ golfcourse │ hotelier │ indianapolis │ julietta │ kilometre │ limassol

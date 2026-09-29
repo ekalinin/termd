@@ -1,11 +1,12 @@
 BINARY      := termd
 PKG         := ./cmd/termd
-GOLDEN_PKGS := ./internal/render ./internal/diagram ./internal/highlight
+GOLDEN_PKGS := ./internal/render ./internal/diagram ./internal/highlight ./internal/site
 FILE        ?= testdata/regression.md
+SITE_DIR    := _site
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build install run test vet fmt fmt-check golden tidy check clean
+.PHONY: help build install run test vet fmt fmt-check golden tidy check clean site
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -38,6 +39,9 @@ tidy: ## Tidy go.mod and go.sum
 	go mod tidy
 
 check: fmt-check vet test ## Run the format check, vet and tests
+
+site: ## Build the landing page into ./_site
+	go run ./cmd/termd-site $(SITE_DIR)
 
 clean: ## Remove the built binary
 	rm -f $(BINARY)

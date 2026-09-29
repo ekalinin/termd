@@ -25,7 +25,7 @@
 ## 4. Local build and review
 
 - [x] 4.1 Add a Makefile target that builds the site into a directory listed in `.gitignore`; verify `git status` shows no new files after the build and `make check` passes
-- [ ] 4.2 Review the local page in at least two browsers: box-drawing lines are continuous, table columns with emoji and CJK line up, links open their destination, the switchers work with JavaScript disabled, a narrow window scrolls blocks horizontally; choose the font stack and the basic ANSI color values of each theme during this review
+- [x] 4.2 Review the local page in at least two browsers: box-drawing lines are continuous, table columns with emoji and CJK line up, links open their destination, the switchers work with JavaScript disabled, a narrow window scrolls blocks horizontally; choose the font stack and the basic ANSI color values of each theme during this review
 
 ## 5. Deployment
 

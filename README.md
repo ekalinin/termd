@@ -145,7 +145,7 @@ Everything else (other mermaid types, PlantUML, a diagram with a syntax error) i
 
 ```sh
 make          # list targets
-make check    # format check, vet and tests
+make check    # format check, go.mod tidiness check, go vet (host and Windows) and tests
 make run      # render testdata/regression.md
 make run FILE=README.md
 make golden   # regenerate golden files after an intended output change

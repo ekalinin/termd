@@ -6,10 +6,10 @@ SITE_DIR    := _site
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build install run test vet fmt fmt-check golden tidy check clean site
+.PHONY: help build install run test vet vet-windows fmt fmt-check golden tidy tidy-check check clean site
 
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build the binary into ./termd
 	go build -o $(BINARY) $(PKG)
@@ -26,6 +26,9 @@ test: ## Run all tests
 vet: ## Run go vet
 	go vet ./...
 
+vet-windows: ## Run go vet for the Windows build
+	GOOS=windows go vet ./...
+
 fmt: ## Format the code with gofmt
 	gofmt -w cmd internal
 
@@ -38,7 +41,10 @@ golden: ## Regenerate golden files after an intended output change
 tidy: ## Tidy go.mod and go.sum
 	go mod tidy
 
-check: fmt-check vet test ## Run the format check, vet and tests
+tidy-check: ## Fail if go.mod or go.sum needs go mod tidy
+	go mod tidy -diff
+
+check: fmt-check tidy-check vet vet-windows test ## Run the format and tidy checks, vet (host and Windows) and tests
 
 site: ## Build the landing page into ./_site
 	go run ./cmd/termd-site $(SITE_DIR)

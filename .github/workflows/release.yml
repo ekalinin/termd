@@ -1,0 +1,98 @@
+name: Release
+
+# Started by hand: gh workflow run release.yml -f version=vX.Y.Z
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, vX.Y.Z or vX.Y.Z-<pre-release>
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One release at a time; a waiting release sees the tag of the previous one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Check the branch and the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::releases are made from main, not from $GITHUB_REF_NAME"
+            exit 1
+          fi
+          if ! printf '%s\n' "$VERSION" | grep -Eq "$semver"; then
+            echo "::error::version $VERSION is not vX.Y.Z or vX.Y.Z-<pre-release>"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::tag $VERSION already exists"
+            exit 1
+          fi
+          # versionsort.suffix sorts a pre-release before its release.
+          greatest() {
+            git -c versionsort.suffix=- tag -l --sort=-v:refname | grep -E -m 1 "$semver" || true
+          }
+          latest=$(greatest)
+          git tag "$VERSION"
+          if [ "$(greatest)" != "$VERSION" ]; then
+            echo "::error::version $VERSION is not greater than the latest tag $latest"
+            exit 1
+          fi
+          major=${VERSION#v}
+          major=${major%%.*}
+          module=$(go list -m)
+          if [ "$major" -ge 2 ] && [ "${module%/v"$major"}" = "$module" ]; then
+            echo "::error::version $VERSION needs the module path $module to end with /v$major"
+            exit 1
+          fi
+
+  ci:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # goreleaser reads the previous tag and the commits for the changelog.
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # Local only: goreleaser and go build take the version from it. GitHub
+      # creates the tag when the draft is published.
+      - run: git tag "$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Publish the draft
+        run: gh release edit "$VERSION" --draft=false
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}

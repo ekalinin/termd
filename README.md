@@ -21,6 +21,8 @@ With Go 1.27 or later:
 go install github.com/ekalinin/termd/cmd/termd@latest
 ```
 
+Prebuilt binaries for Linux, macOS and Windows on amd64 and arm64 are attached to every [release](https://github.com/ekalinin/termd/releases). Unpack the archive for your platform and put `termd` on your `PATH`; `checksums.txt` holds the SHA-256 of every archive. On macOS, a binary downloaded with a browser is quarantined by Gatekeeper; `xattr -d com.apple.quarantine termd` removes the attribute. The Windows binaries are best-effort: termd does not enable virtual terminal processing in the console and was not tested on Windows.
+
 From source:
 
 ```sh
@@ -39,6 +41,7 @@ cat README.md | termd       # render standard input
 termd - < README.md         # same, explicitly
 termd --width 60 doc.md     # lay out for 60 columns
 termd doc.md > doc.txt      # plain text, 80 columns
+termd --version             # print the version
 ```
 
 | Flag | Values | Default | Description |
@@ -47,6 +50,7 @@ termd doc.md > doc.txt      # plain text, 80 columns
 | `--no-pager` | | off | print directly instead of paging through `less` |
 | `--hyperlinks` | `auto`, `always`, `never` | `auto` | terminal hyperlinks; `auto` enables them only when stdout is a terminal |
 | `--theme` | `auto`, `dark`, `light` | `auto` | code highlighting theme; `auto` asks the terminal for its background color |
+| `--version` | | | print the version and exit |
 
 Exit status: `0` when the document was rendered (even if some diagrams were shown as source), `1` when the file cannot be read, `2` on a usage error.
 
@@ -204,6 +208,21 @@ go test ./internal/render -run 'TestGolden/tables' -update
 ```
 
 The `-update` flag exists only in the packages with golden tests, so pass it per package, as `make golden` does; `go test ./... -update` fails with `flag provided but not defined: -update`.
+
+### Releases
+
+A release is published from `main` by the Release workflow. It runs `make check`, builds the archives with [GoReleaser](https://goreleaser.com) and creates the version tag only after everything was uploaded:
+
+```sh
+gh workflow run release.yml -f version=vX.Y.Z
+```
+
+The same build runs locally without publishing:
+
+```sh
+make release-check      # validate the GoReleaser config
+make release-snapshot   # build the release archives into dist/
+```
 
 ## Acknowledgements
 

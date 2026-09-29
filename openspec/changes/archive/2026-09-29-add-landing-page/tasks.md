@@ -30,6 +30,6 @@
 ## 5. Deployment
 
 - [x] 5.1 Add `.github/workflows/` workflow that runs on push to `main` with permissions `contents: read`, `pages: write`, `id-token: write` and a concurrency group: checkout, `setup-go` with `go-version-file: go.mod`, the generator, `upload-pages-artifact`, `deploy-pages`, using the current major versions of these actions; verify the workflow file parses (for example with `actionlint`)
-- [ ] 5.2 Maintainer sets Settings -> Pages -> Source to "GitHub Actions" before the merge; verify `gh api repos/ekalinin/termd/pages` returns `"build_type": "workflow"`
-- [ ] 5.3 After the merge, check the deployment run and open `https://ekalinin.github.io/termd/`; verify the page shows all five examples at 80 columns and the width and theme switchers work
-- [ ] 5.4 Maintainer fills the repository Homepage field with the site URL; verify `gh repo view --json homepageUrl` returns it
+- [x] 5.2 Maintainer sets Settings -> Pages -> Source to "GitHub Actions" before the merge; verify `gh api repos/ekalinin/termd/pages` returns `"build_type": "workflow"`
+- [x] 5.3 After the merge, check the deployment run and open `https://ekalinin.github.io/termd/`; verify the page shows all five examples at 80 columns and the width and theme switchers work
+- [x] 5.4 Maintainer fills the repository Homepage field with the site URL; verify `gh repo view --json homepageUrl` returns it

@@ -24,8 +24,8 @@
 
 ## 5. Before the merge
 
-- [ ] 5.1 Verify that GoReleaser creates a draft without a tag: from a scratch clone of the committed branch with a local tag `v0.0.0-draft.1` on HEAD, run `GITHUB_TOKEN=$(gh auth token) goreleaser release --clean`; a draft `v0.0.0-draft.1` appears on the Releases page with the uploaded files and the commit of HEAD as its target, and `git ls-remote --tags origin` shows no tag; delete the draft with `gh release delete v0.0.0-draft.1 --yes` (if a tag appeared, delete it at once with `git push origin :refs/tags/v0.0.0-draft.1`, switch the `release` job to the fallback from design.md and repeat)
-- [ ] 5.2 Open the pull request with this change; verify the `check` job runs for it and passes (`gh pr checks`)
+- [x] 5.1 Verify that GoReleaser creates a draft without a tag: from a scratch clone of the committed branch with a local tag `v0.0.0-draft.1` on HEAD, run `GITHUB_TOKEN=$(gh auth token) goreleaser release --clean`; a draft `v0.0.0-draft.1` appears on the Releases page with the uploaded files and the commit of HEAD as its target, and `git ls-remote --tags origin` shows no tag; delete the draft with `gh release delete v0.0.0-draft.1 --yes` (if a tag appeared, delete it at once with `git push origin :refs/tags/v0.0.0-draft.1`, switch the `release` job to the fallback from design.md and repeat)
+- [x] 5.2 Open the pull request with this change; verify the `check` job runs for it and passes (`gh pr checks`)
 
 ## 6. After the merge
 

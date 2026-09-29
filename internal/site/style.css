@@ -1,0 +1,228 @@
+/* Colors follow the color-scheme: the system one with the auto theme, the
+   chosen one with the light or dark theme. The accent is the cyan termd
+   paints inline code with. */
+:root {
+  color-scheme: light dark;
+  --canvas: light-dark(#eef1f5, #080a0e);
+  --chrome: light-dark(#f6f8fa, #131820);
+  --surface: light-dark(#ffffff, #0d1117);
+  --ink: light-dark(#141821, #e6e9ef);
+  --muted: light-dark(#5d6776, #8a94a6);
+  --rule: light-dark(#d7dde5, #242b36);
+  --accent: light-dark(#0e7c86, #3cc4cc);
+  --shadow: light-dark(rgb(20 24 33 / .07), rgb(0 0 0 / .45));
+  --term-fg: light-dark(#1f2328, #e6edf3);
+  --ansi-30: light-dark(#24292f, #484f58);
+  --ansi-31: light-dark(#cf222e, #ff7b72);
+  --ansi-32: light-dark(#116329, #3fb950);
+  --ansi-33: light-dark(#4d2d00, #d29922);
+  --ansi-34: light-dark(#0969da, #58a6ff);
+  --ansi-35: light-dark(#8250df, #bc8cff);
+  --ansi-36: light-dark(#1b7c83, #39c5cf);
+  --ansi-37: light-dark(#6e7781, #b1bac4);
+  --ansi-90: light-dark(#57606a, #6e7681);
+  --ansi-91: light-dark(#a40e26, #ffa198);
+  --ansi-92: light-dark(#1a7f37, #56d364);
+  --ansi-93: light-dark(#633c01, #e3b341);
+  --ansi-94: light-dark(#218bff, #79c0ff);
+  --ansi-95: light-dark(#a475f9, #d2a8ff);
+  --ansi-96: light-dark(#3192aa, #56d4dd);
+  --ansi-97: light-dark(#8c959f, #ffffff);
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pad: 20px;
+}
+
+:root:has(#theme-light:checked) { color-scheme: light; }
+:root:has(#theme-dark:checked) { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0 auto;
+  max-width: 48rem;
+  padding: 0 1.25rem;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 16px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+a { color: var(--accent); text-underline-offset: 3px; }
+
+/* Hero: the name set large in the same monospace as the output. */
+.hero { padding: clamp(3rem, 12vh, 7rem) 0 2.5rem; }
+.hero h1 {
+  margin: 0;
+  font: 700 clamp(3.5rem, 13vw, 6.5rem)/.9 var(--mono);
+  letter-spacing: -.03em;
+}
+.tagline {
+  max-width: 30ch;
+  margin: 1.25rem 0 2rem;
+  font-size: clamp(1.3rem, 3.2vw, 1.75rem);
+  line-height: 1.25;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+}
+.actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.install {
+  flex: 1 1 22rem;
+  min-width: 0;
+  margin: 0;
+  padding: .8rem 1rem;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  font: 14px/1.4 var(--mono);
+  scrollbar-width: thin;
+}
+.prompt { color: var(--accent); user-select: none; }
+.github {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .8rem 1.1rem;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--canvas);
+  font-weight: 600;
+  text-decoration: none;
+}
+.github:hover { background: color-mix(in srgb, var(--ink) 85%, var(--accent)); }
+
+/* The switchers: segmented controls built from radio inputs and labels. */
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 2rem;
+  padding: .75rem 0;
+  background: color-mix(in srgb, var(--canvas) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule);
+}
+.group { display: flex; align-items: center; gap: .6rem; }
+.label { color: var(--muted); font-size: .875rem; }
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--chrome);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label {
+  padding: .3rem .7rem;
+  border-radius: 7px;
+  color: var(--muted);
+  font: 500 13px/1.2 var(--mono);
+  cursor: pointer;
+}
+.seg label:hover { color: var(--ink); }
+.seg input:checked + label {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--rule), 0 1px 3px var(--shadow);
+}
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+main { padding: 1rem 0 2rem; }
+.example { margin: 2.5rem 0; }
+
+/* A terminal window exactly as wide as the chosen number of columns: the
+   ruler marks them, output wider than that scrolls, as in less -S. */
+.cols-40 { --cols: 40; }
+.cols-60 { --cols: 60; }
+.cols-80 { --cols: 80; }
+.window {
+  width: calc(var(--cols) * 1ch + 2 * var(--pad) + 2px);
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px var(--shadow), 0 12px 32px -12px var(--shadow);
+  font: 14px/1.2 var(--mono);
+}
+.titlebar {
+  padding: .55rem var(--pad);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.screen {
+  padding: .75rem var(--pad) 1.25rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.ruler {
+  margin-bottom: .75rem;
+  color: color-mix(in srgb, var(--muted) 45%, transparent);
+  white-space: pre;
+}
+.ruler b { color: var(--accent); font-weight: 400; }
+
+/* Terminal output. A fixed line-height keeps every line the same height,
+   whatever font draws an emoji, and box-drawing lines continuous. */
+.term {
+  margin: 0;
+  color: var(--term-fg);
+  font: inherit;
+  white-space: pre;
+  tab-size: 8;
+}
+.term a { color: inherit; text-decoration: none; }
+/* A grapheme cluster two columns wide takes exactly two cells. */
+.term .w { display: inline-block; width: 2ch; text-align: center; }
+.term .b { font-weight: bold; }
+.term .f { opacity: .6; }
+.term .i { font-style: italic; }
+.term .u { text-decoration-line: underline; }
+.term .s { text-decoration-line: line-through; }
+.term .u.s { text-decoration-line: underline line-through; }
+
+/* Width: 80 columns unless another width is checked. */
+.cols-40, .cols-60 { display: none; }
+:root:has(#width-40:checked) .cols-40,
+:root:has(#width-60:checked) .cols-60 { display: block; }
+:root:has(#width-40:checked) .cols-80,
+:root:has(#width-60:checked) .cols-80 { display: none; }
+
+/* Theme: an example that depends on the highlighting theme has a dark and
+   a light rendering; show the one that matches the page. */
+.window.light { display: none; }
+@media (prefers-color-scheme: light) {
+  .window.light { display: block; }
+  .window.dark { display: none; }
+}
+:root:has(#theme-light:checked) .window.light,
+:root:has(#theme-dark:checked) .window.dark { display: block; }
+:root:has(#theme-light:checked) .window.dark,
+:root:has(#theme-dark:checked) .window.light { display: none; }
+
+footer {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem 0 3rem;
+  border-top: 1px solid var(--rule);
+  font-size: .875rem;
+}
+footer a { color: var(--muted); }
+footer a:hover { color: var(--ink); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .seg label, .github, footer a { transition: color .15s, background-color .15s, box-shadow .15s; }
+}

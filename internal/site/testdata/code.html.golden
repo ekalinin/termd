@@ -1,0 +1,33 @@
+<span class="b"># Code</span>
+
+<span style="color:#ff7b72">package</span><span style="color:#6e7681"> </span>main
+
+<span style="color:#ff7b72">import</span><span style="color:#6e7681"> </span><span style="color:#a5d6ff">&#34;fmt&#34;</span>
+
+<span class="i" style="color:#8b949e">// main prints a greeting.</span>
+<span style="color:#ff7b72">func</span><span style="color:#6e7681"> </span><span class="b" style="color:#d2a8ff">main</span>()<span style="color:#6e7681"> </span>{
+<span style="color:#6e7681">	</span>fmt.<span class="b" style="color:#d2a8ff">Println</span>(<span style="color:#a5d6ff">&#34;hello, world&#34;</span>)<span style="color:#6e7681"> </span><span class="i" style="color:#8b949e">// tab-indented</span>
+}
+
+<span style="color:#ff7b72">def</span> <span class="b" style="color:#d2a8ff">greet</span>(name: str) <span class="b" style="color:#ff7b72">-&gt;</span> str:
+    <span style="color:#a5d6ff">&#34;&#34;&#34;Return a greeting.&#34;&#34;&#34;</span>
+    <span style="color:#ff7b72">return</span> <span style="color:#79c0ff">f</span><span style="color:#a5d6ff">&#34;hello, {</span>name<span style="color:#a5d6ff">}&#34;</span>  <span class="i" style="color:#8b949e"># comment</span>
+
+<span class="b i" style="color:#8b949e">#!/bin/sh</span>
+echo <span style="color:#a5d6ff">&#34;hello&#34;</span> | tr a-z A-Z   <span class="i" style="color:#8b949e"># upper-case</span>
+
+unknown language   keeps   spaces
+
+no info string
+
+indented code block
+    with more indentation
+
+a code line that is wider than eighty columns: 0123456789012345678901234567890123456789012345678901234567890123456789
+
+<span class="f">────────────────────────────────────────────────────────────</span>
+
+&lt;details&gt;
+&lt;summary&gt;More&lt;/summary&gt;
+text
+&lt;/details&gt;

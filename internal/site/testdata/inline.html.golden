@@ -1,0 +1,10 @@
+<span class="b"># Inline formatting</span>
+
+Text with <span class="b">bold</span>, <span class="i">italic</span>, <span class="s">gone</span> and <span style="color:var(--ansi-36)">code</span> spans, plus <span class="b i">both</span> at once.
+
+A <a href="https://example.com/very/long/path/to/documentation/page"><span class="u" style="color:var(--ansi-34)">link</span></a> inside a sentence, a bare URL <a href="https://example.com"><span class="u" style="color:var(--ansi-34)">https://example.com</span></a> and an email
+<a href="mailto:user@example.com"><span class="u" style="color:var(--ansi-34)">user@example.com</span></a>.
+
+An image <a href="docs/arch.png"><span class="u" style="color:var(--ansi-34)">[image: architecture]</span></a> and inline &lt;kbd&gt;Ctrl&lt;/kbd&gt; HTML.
+
+Escaped *stars* and an entity &amp; stay literal.

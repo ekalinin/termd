@@ -1,0 +1,33 @@
+[1m# Code[0m
+
+[38;2;255;123;114mpackage[0m[38;2;110;118;129m [0mmain
+
+[38;2;255;123;114mimport[0m[38;2;110;118;129m [0m[38;2;165;214;255m"fmt"[0m
+
+[3;38;2;139;148;158m// main prints a greeting.[0m
+[38;2;255;123;114mfunc[0m[38;2;110;118;129m [0m[1;38;2;210;168;255mmain[0m()[38;2;110;118;129m [0m{
+[38;2;110;118;129m	[0mfmt.[1;38;2;210;168;255mPrintln[0m([38;2;165;214;255m"hello, world"[0m)[38;2;110;118;129m [0m[3;38;2;139;148;158m// tab-indented[0m
+}
+
+[38;2;255;123;114mdef[0m [1;38;2;210;168;255mgreet[0m(name: str) [1;38;2;255;123;114m->[0m str:
+    [38;2;165;214;255m"""Return a greeting."""[0m
+    [38;2;255;123;114mreturn[0m [38;2;121;192;255mf[0m[38;2;165;214;255m"hello, {[0mname[38;2;165;214;255m}"[0m  [3;38;2;139;148;158m# comment[0m
+
+[1;3;38;2;139;148;158m#!/bin/sh[0m
+echo [38;2;165;214;255m"hello"[0m | tr a-z A-Z   [3;38;2;139;148;158m# upper-case[0m
+
+unknown language   keeps   spaces
+
+no info string
+
+indented code block
+    with more indentation
+
+a code line that is wider than eighty columns: 0123456789012345678901234567890123456789012345678901234567890123456789
+
+[2m────────────────────────────────────────────────────────────[0m
+
+<details>
+<summary>More</summary>
+text
+</details>

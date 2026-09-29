@@ -13,5 +13,5 @@
 ## 3. Workflow
 
 - [x] 3.1 Add `.github/workflows/ci.yml`: name `CI`; triggers `pull_request` and `push` to `main`; permissions `contents: read`; a concurrency group of the workflow name plus the pull request number or, for a push, the run id, with `cancel-in-progress` true; one job `check` on `ubuntu-latest` with `actions/checkout@v7`, `actions/setup-go@v7` with `go-version-file: go.mod`, and `make check`; verify the file parses with `actionlint` (for example `go run github.com/rhysd/actionlint/cmd/actionlint@latest`)
-- [ ] 3.2 Open the pull request with this change; verify the `check` job runs for it and passes (`gh pr checks`)
-- [ ] 3.3 After the merge, verify the push to `main` ran the `check` job for the merge commit and it passed, next to the Pages deployment (`gh run list --branch main`)
+- [x] 3.2 Open the pull request with this change; verify the `check` job runs for it and passes (`gh pr checks`)
+- [x] 3.3 After the merge, verify the push to `main` ran the `check` job for the merge commit and it passed, next to the Pages deployment (`gh run list --branch main`)

@@ -10,4 +10,4 @@
 
 ## 2. After the merge
 
-- [ ] 2.1 After the `Pages` run for the merge commit passes, open `https://ekalinin.github.io/termd/`; verify the badge shows the same tag as `gh release view --json tagName --jq .tagName`, and clicking it opens that release
+- [x] 2.1 After the `Pages` run for the merge commit passes, open `https://ekalinin.github.io/termd/`; verify the badge shows the same tag as `gh release view --json tagName --jq .tagName`, and clicking it opens that release

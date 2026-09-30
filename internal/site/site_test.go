@@ -102,6 +102,11 @@ func TestPageComposition(t *testing.T) {
 	if n := strings.Count(p, `<section class="example"`); n != 5 {
 		t.Errorf("%d examples on the page, want 5", n)
 	}
+	hero := p[:strings.Index(p, "</header>")]
+	release := `<a href="` + releaseURL + `"><img src="` + badgeURL + `" alt="Latest release"></a>`
+	if i := strings.Index(hero, release); i < strings.Index(hero, `<div class="actions">`) {
+		t.Errorf("hero has no %q after the install command", release)
+	}
 	footer := p[strings.Index(p, "<footer>"):]
 	for _, want := range []string{repoURL + `"`, licenseURL + `"`} {
 		if !strings.Contains(footer, want) {

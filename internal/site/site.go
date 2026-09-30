@@ -30,8 +30,12 @@ var (
 const (
 	repoURL        = "https://github.com/ekalinin/termd"
 	licenseURL     = repoURL + "/blob/main/LICENSE"
+	releaseURL     = repoURL + "/releases/latest"
 	installCommand = "go install github.com/ekalinin/termd/cmd/termd@latest"
 	description    = "A terminal markdown viewer that renders tables and diagrams correctly."
+	// badgeURL shows the tag of the release that releaseURL opens; the
+	// reader's browser loads it, so the page needs no rebuild on a release.
+	badgeURL = "https://img.shields.io/github/v/release/ekalinin/termd"
 	// defaultWidth is the width selected when the page opens: the width
 	// termd uses when it does not write to a terminal.
 	defaultWidth = 80
@@ -143,10 +147,11 @@ func Page() ([]byte, error) {
 	}
 	data := struct {
 		Description, Install, Repo, License string
+		Release, Badge                      string
 		Widths                              []int
 		DefaultWidth                        int
 		Examples                            []Example
-	}{description, installCommand, repoURL, licenseURL, widths, defaultWidth, examples}
+	}{description, installCommand, repoURL, licenseURL, releaseURL, badgeURL, widths, defaultWidth, examples}
 	var b bytes.Buffer
 	if err := pageTmpl.Execute(&b, data); err != nil {
 		return nil, err

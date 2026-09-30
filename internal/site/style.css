@@ -93,6 +93,10 @@ a { color: var(--accent); text-underline-offset: 3px; }
   text-decoration: none;
 }
 .github:hover { background: color-mix(in srgb, var(--ink) 85%, var(--accent)); }
+/* The badge is 20px high; the line keeps that height while it loads, when
+   the browser shows the alt text instead. */
+.release { min-height: 20px; margin: .75rem 0 0; line-height: 20px; }
+.release img { display: block; }
 
 /* The switchers: segmented controls built from radio inputs and labels. */
 .controls {

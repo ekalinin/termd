@@ -137,6 +137,31 @@ func TestInputSources(t *testing.T) {
 	})
 }
 
+func TestVersion(t *testing.T) {
+	path := writeFile(t, "# From file\n")
+	for _, args := range [][]string{{"--version"}, {"--version", path}} {
+		f := &fake{}
+		e := f.env()
+		e.version = "v1.2.3"
+		stdin := strings.NewReader("# From stdin\n")
+		e.stdin = stdin
+		fileRead := false
+		e.readFile = func(string) ([]byte, error) {
+			fileRead = true
+			return nil, errors.New("unexpected read")
+		}
+		if code := run(args, e); code != 0 {
+			t.Errorf("%v: exit %d, want 0", args, code)
+		}
+		if got := f.stdout.String(); got != "termd v1.2.3\n" {
+			t.Errorf("%v: stdout %q, want %q", args, got, "termd v1.2.3\n")
+		}
+		if fileRead || stdin.Len() != len("# From stdin\n") {
+			t.Errorf("%v: input was read", args)
+		}
+	}
+}
+
 func TestPipeOutput(t *testing.T) {
 	f := &fake{stdin: "**bold** [link](https://example.com)\n\n" + longParagraph + "\n```go\nfunc main() {}\n```\n"}
 	if code := f.run(); code != 0 {

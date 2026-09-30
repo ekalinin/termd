@@ -1,0 +1,70 @@
+# Release build: cross-compiled binaries, archives, checksums and a grouped
+# changelog for the version given to .github/workflows/release.yml. Validate
+# with `make release-check`, dry-run with `make release-snapshot`.
+version: 2
+project_name: termd
+
+builds:
+  - main: ./cmd/termd
+    binary: termd
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # Set explicitly to drop the default -X main.version=... flags: termd reads
+    # its version from the build info, where go build records the tag.
+    ldflags:
+      - -s -w
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: git
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat(\(.+\))?:'
+      order: 0
+    - title: Fixes
+      regexp: '^fix(\(.+\))?:'
+      order: 1
+    - title: Performance
+      regexp: '^perf(\(.+\))?:'
+      order: 2
+    - title: Refactoring
+      regexp: '^refactor(\(.+\))?:'
+      order: 3
+    - title: Documentation
+      regexp: '^docs(\(.+\))?:'
+      order: 4
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - '^chore(\(.+\))?:'
+      - '^Merge pull request'
+      - '^Merge branch'
+
+release:
+  # A draft has no tag yet. The workflow publishes the draft as its last step,
+  # and only then GitHub creates the tag, at the commit given here.
+  draft: true
+  replace_existing_draft: true
+  target_commitish: "{{ .FullCommit }}"
+  prerelease: auto
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"

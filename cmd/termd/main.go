@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"regexp"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -54,6 +55,8 @@ type env struct {
 	runPager func(path, content string) error
 	// detectLight reports whether the terminal background is light.
 	detectLight func() (light, ok bool)
+	// version is printed by --version.
+	version string
 }
 
 func main() {
@@ -76,7 +79,18 @@ func systemEnv() env {
 		lookPath:    exec.LookPath,
 		runPager:    runLess,
 		detectLight: func() (bool, bool) { return termbg.Light(themeQueryTimeout) },
+		version:     buildVersion(),
 	}
+}
+
+// buildVersion returns the main module version Go recorded in the binary: the
+// tag for a release build or go install @tag, a pseudo-version for a build
+// from a git checkout, and "(devel)" when no version is recorded.
+func buildVersion() string {
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" {
+		return bi.Main.Version
+	}
+	return "(devel)"
 }
 
 // run executes termd and returns the exit status.
@@ -87,6 +101,7 @@ func run(args []string, e env) int {
 	noPager := fs.Bool("no-pager", false, "print directly instead of paging through less")
 	hyperlinks := fs.String("hyperlinks", "auto", "terminal hyperlinks: auto, always or never")
 	theme := fs.String("theme", "auto", "code highlighting theme: auto, dark or light")
+	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = func() {
 		fmt.Fprint(e.stderr, usage)
 		fs.PrintDefaults()
@@ -96,6 +111,10 @@ func run(args []string, e env) int {
 			return 0
 		}
 		return 2
+	}
+	if *showVersion {
+		fmt.Fprintf(e.stdout, "termd %s\n", e.version)
+		return 0
 	}
 	usageError := func(format string, a ...any) int {
 		fmt.Fprintf(e.stderr, "termd: "+format+"\n", a...)

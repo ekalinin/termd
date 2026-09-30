@@ -6,10 +6,10 @@ SITE_DIR    := _site
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build install run test vet vet-windows fmt fmt-check golden tidy tidy-check check clean site
+.PHONY: help build install run test vet vet-windows fmt fmt-check golden tidy tidy-check check clean site release-check release-snapshot
 
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build the binary into ./termd
 	go build -o $(BINARY) $(PKG)
@@ -48,6 +48,12 @@ check: fmt-check tidy-check vet vet-windows test ## Run the format and tidy chec
 
 site: ## Build the landing page into ./_site
 	go run ./cmd/termd-site $(SITE_DIR)
+
+release-check: ## Validate the GoReleaser config
+	goreleaser check
+
+release-snapshot: ## Build the release archives into ./dist without publishing
+	goreleaser release --snapshot --clean
 
 clean: ## Remove the built binary
 	rm -f $(BINARY)

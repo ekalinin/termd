@@ -46,10 +46,16 @@ func Parse(src []byte) ast.Node {
 	return md.Parser().Parse(gtext.NewReader(src))
 }
 
-// Render lays out a markdown document and returns the terminal output.
+// Render lays out a markdown document and returns the terminal output. A
+// leading YAML frontmatter block is shown before the document.
 func Render(src []byte, opts Options) string {
-	r := &renderer{src: src, opts: opts}
-	lines := join(r.blocks(Parse(src), opts.Width), true)
+	fm, body := splitFrontmatter(src)
+	r := &renderer{src: body, opts: opts}
+	var blocks []Block
+	if b, ok := frontmatterBlock(fm, opts.Width); ok {
+		blocks = append(blocks, b)
+	}
+	lines := join(append(blocks, r.blocks(Parse(body), opts.Width)...), true)
 	var b strings.Builder
 	for _, l := range lines {
 		b.WriteString(l.Render(opts.Style))

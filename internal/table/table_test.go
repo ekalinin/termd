@@ -207,6 +207,34 @@ func TestSeparatorsWithEmojiAndCJK(t *testing.T) {
 	assertAligned(t, lineStrings(lines))
 }
 
+func TestHeaderless(t *testing.T) {
+	description := strings.TrimSpace(strings.Repeat("render tables and diagrams ", 6) + "in every modern terminal with care")
+	if n := len(strings.Fields(description)); n != 30 {
+		t.Fatalf("description has %d words, want 30", n)
+	}
+	tbl := Table{Rows: [][]Cell{cells("title", "Doc"), cells("description", description)}}
+	lines, wide := tbl.Render(40)
+	got := lineStrings(lines)
+	if wide {
+		t.Error("table marked wide")
+	}
+	if len(got) == 0 {
+		t.Fatal("headerless table rendered no lines")
+	}
+	if !strings.HasPrefix(got[0], "title") {
+		t.Errorf("first line %q is not the title row", got[0])
+	}
+	for _, l := range got {
+		if strings.Contains(l, "─") {
+			t.Errorf("headerless table has a rule: %q", l)
+		}
+		if w := text.Width(l); w > 40 {
+			t.Errorf("line %q is %d wide", l, w)
+		}
+	}
+	assertAligned(t, got)
+}
+
 func TestRaggedRows(t *testing.T) {
 	tbl := Table{
 		Header: cells("a", "b", "c"),

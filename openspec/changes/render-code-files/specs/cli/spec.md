@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Code files
-When the input is a file whose name the highlighter recognizes, by its extension or by its whole name, as a language other than markdown or plain text (for example `main.go`, `config.yaml`, `Makefile`, `Dockerfile`), termd SHALL NOT parse the file as markdown. termd SHALL render the whole file as one code block: every line verbatim with its whitespace, never wrapped, and output in full when it is wider than the output width. The file SHALL NOT be rendered as a diagram. When styling is enabled, termd SHALL color the tokens in the language of the file name without changing the text, whitespace or line breaks, and SHALL select the theme as for a code block in a recognized language. When styling is disabled, the output SHALL be the text of the file. When the file does not end with a line break, termd SHALL output a line break after its last line. An empty file SHALL produce no output. Read errors and exit statuses SHALL be the same as for a markdown file.
+When the input is a file whose name the highlighter recognizes, by its extension or by its whole name, as a language other than markdown or plain text (for example `main.go`, `config.yaml`, `Makefile`, `Dockerfile`), termd SHALL NOT parse the file as markdown. termd SHALL render the whole file as one code block: every line verbatim with its whitespace, never wrapped, and output in full when it is wider than the output width. The file SHALL NOT be rendered as a diagram. When styling is enabled, termd SHALL color the tokens in the language of the file name without changing the text, whitespace or line breaks, and SHALL select the theme as for a code block in a recognized language. When styling is disabled, the output SHALL be the text of the file. Control characters and line endings SHALL be handled as in the text of a markdown document, in both modes. When the file does not end with a line break, termd SHALL output a line break after its last line. An empty file SHALL produce no output. Read errors and exit statuses SHALL be the same as for a markdown file.
 
 termd SHALL render as markdown, regardless of the content: a file whose name the highlighter recognizes as markdown (for example `doc.md`) or as plain text (for example `notes.txt`), a file whose name it does not recognize (for example `README` without an extension), and a document read from stdin.
 
@@ -42,6 +42,10 @@ termd SHALL render as markdown, regardless of the content: a file whose name the
 #### Scenario: Empty file
 - **WHEN** the user runs `termd empty.go` and the file is empty
 - **THEN** termd outputs nothing and exits with status 0
+
+#### Scenario: Control characters in a code file
+- **WHEN** the user runs `termd main.go > out.txt`, `main.go` uses CRLF line endings and holds the comment `// ` followed by ESC, `]0;x` and BEL
+- **THEN** `out.txt` holds the comment as `// ␛]0;x␇`, has LF line endings and contains no control character other than line feed
 
 #### Scenario: Markdown file
 - **WHEN** the user runs `termd doc.md` with the output to a pipe and the file holds the lines `first line` and `second line`

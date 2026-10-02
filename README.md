@@ -127,7 +127,7 @@ With `--theme=auto`, termd asks the terminal for its background color (OSC 11) a
 
 ### Code files
 
-When chroma recognizes the name of the input file as a language other than markdown or plain text, by its extension or by its whole name (`main.go`, `config.yaml`, `Makefile`, `Dockerfile`), termd shows the whole file as one code block instead of parsing it as markdown: every line as it is in the file, never wrapped, highlighted in a terminal, and scrolled horizontally in the pager when a line is wider than the screen. In a pipe, the output is the text of the file.
+When chroma recognizes the name of the input file as a language other than markdown or plain text, by its extension or by its whole name (`main.go`, `config.yaml`, `Makefile`, `Dockerfile`), termd shows the whole file as one code block instead of parsing it as markdown: every line as it is in the file, never wrapped, highlighted in a terminal, and scrolled horizontally in the pager when a line is wider than the screen. In a pipe, the output is the text of the file, with control characters and line endings handled as described in "Control characters".
 
 Markdown files, plain text files such as `notes.txt`, files with a name chroma does not recognize (for example `README` without an extension) and standard input are rendered as markdown. The choice is made by the file name only, never by the content.
 

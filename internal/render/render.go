@@ -67,12 +67,13 @@ func Render(src []byte, opts Options) string {
 
 // Code lays out the whole text of a source file as one code block and returns
 // the terminal output. The file name selects the highlighting language. The
-// text is never parsed as markdown and never drawn as a diagram.
+// text is never parsed as markdown and never drawn as a diagram. Control
+// characters are cleaned as in a markdown document.
 func Code(src []byte, name string, opts Options) string {
 	if len(src) == 0 {
 		return ""
 	}
-	code := strings.TrimSuffix(string(src), "\n")
+	code := strings.TrimSuffix(string(cleanSource(src)), "\n")
 	r := &renderer{opts: opts}
 	var lines []text.Line
 	if opts.Style.Styled && highlight.RecognizedFile(name) {

@@ -91,8 +91,7 @@ chroma v2.27.0 has no lexer for mermaid or PlantUML, so `.mmd`, `.mermaid`, `.pu
 
 - [A file is highlighted by a wrong lexer because chroma's patterns overlap, for example `go.mod` as AMPL] → The text is unchanged and every line is kept; only the colors are off. Better patterns belong upstream.
 - [A document with a code-like name, for example `notes.org`, is shown as code instead of markdown] → Intended by the proposal: only markdown and plain text names are markdown. `cat notes.org | termd` renders it as markdown.
-- [A file with CRLF line endings: in plain mode the carriage returns are output as they are; in styled mode chroma converts the line endings to LF before tokenizing] → Both look the same in a terminal; the plain output stays the text of the file.
-- [A file with lone CR line endings loses lines in styled mode: chroma turns each CR into a line break and `Highlight` keeps only as many lines as the code has LF line breaks] → The same happens today to a code block with such content. Control characters in document text belong to the separate escape-control-characters change; the code file path shares `verbatim` and `Highlight` with code blocks, so a fix there covers both.
+- [`render.Code` does not go through `render.Render`, so it would bypass the control character cleaning of escape-control-characters, which runs in `Render`] → `Code` calls the same `cleanSource` first: control characters are shown as control pictures, and CRLF and a lone CR become LF, in plain and styled mode alike. The plain output is the text of the file only when the file has no control characters other than tab and line feed.
 - [Highlighting a very large file is slower than printing it] → The same tokenizer runs for code blocks today; no limit is added.
 
 ## Migration Plan

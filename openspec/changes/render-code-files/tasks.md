@@ -27,3 +27,7 @@
 
 - [x] 6.1 Run `make check` and `openspec validate render-code-files --strict`; verify both pass and `git status testdata/golden` shows no modified files
 - [x] 6.2 Run `make build` and `./termd --no-pager` on `cmd/termd/main.go`, `Makefile`, `.github/workflows/ci.yml`, `openspec/config.yaml` and `README.md`, in a pipe and in a pseudo-terminal (`script -q /dev/null ./termd --no-pager --theme=dark ...`); verify the code files are output line by line (plain output identical to the file, `cmp`), are highlighted in the terminal, the YAML `#` comments are not headings, and `README.md` renders as markdown as before
+
+## 7. Control characters
+
+- [x] 7.1 After the rebase on escape-control-characters, add the cases `control characters` (ESC and BEL become `␛` and `␇`) and `crlf and lone cr` (both become LF) to `TestCode` and a styled case with ESC and BEL, then call `cleanSource` in `render.Code`; verify `go test ./internal/render` fails before the call and passes after it, and `./termd --no-pager` on a `.go` file with ESC, BEL and CRLF outputs no raw control characters

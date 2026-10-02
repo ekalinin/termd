@@ -305,6 +305,8 @@ func TestCode(t *testing.T) {
 		{"comments and dashes", "config.yaml", "---\n# Server settings\nport: 8080\n", "---\n# Server settings\nport: 8080\n"},
 		{"fence line", "main.go", fence, fence},
 		{"wide line", "x.go", wide + "\n", wide + "\n"},
+		{"control characters", "x.go", "a \x1b]0;x\x07 b\n", "a ␛]0;x␇ b\n"},
+		{"crlf and lone cr", "x.go", "a\r\nb\rc\n", "a\nb\nc\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -318,6 +320,10 @@ func TestCode(t *testing.T) {
 	out := Code([]byte(src), "main.go", styled(80))
 	if !strings.Contains(out, "\x1b[") || stripEscapes(out) != src {
 		t.Errorf("styled main.go = %q", out)
+	}
+	out = Code([]byte("// \x1b]0;x\x07\nfunc main() {}\n"), "main.go", styled(80))
+	if want := "// ␛]0;x␇\nfunc main() {}\n"; stripEscapes(out) != want {
+		t.Errorf("styled main.go with control characters = %q, want %q without styles", out, want)
 	}
 }
 

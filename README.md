@@ -119,6 +119,10 @@ With hyperlinks enabled, a link shows only its text and opens its destination wh
 
 When the document is read from a file, relative destinations of links and images, such as `docs/guide.md` or `../img/arch.png`, are resolved against the directory of the file and become `file://` URLs with the host name of the machine, for example `file://myhost/home/me/project/docs/guide.md`, so a click opens the target with the default application of the system. The fragment of a destination (`guide.md#setup`) is kept, its query (`logo.png?raw=true`) is dropped. Absolute URLs, `#section` links and destinations that start with `/` are left as written; GitHub reads `/docs/x.md` as relative to the repository root, which termd does not know. A document read from stdin has no directory, so its links are left as written too. With hyperlinks disabled, `text (url)` always shows the destination as written in the document.
 
+### Footnotes
+
+A footnote reference is shown as `[1]`. Footnotes are numbered in the order of their first reference, not by their labels. The definitions are shown at the end of the document, after a horizontal line, as a numbered list in the order of their numbers; a definition with several paragraphs is laid out like a list item. A definition that is never referenced is not shown. The reference is not a hyperlink, because a terminal hyperlink cannot jump to another place of the output, and there are no back-references from a definition to its reference.
+
 ### Code highlighting
 
 A fenced code block is highlighted when the first word of its info string names a language known to [chroma](https://github.com/alecthomas/chroma) (names and common aliases such as `js`, `sh`, `yml`). Blocks without a language or with an unknown one are shown without colors; the text of a block is never changed.

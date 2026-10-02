@@ -1,0 +1,31 @@
+[1m# Footnotes[0m
+
+A footnote reference shows the number of its note[1]. Labels
+can be numbers[2] or words, and the numbers follow the first
+reference, so the label [36m1[0m gets the number 2. A second
+reference to the same note[1] shows the same number.
+
+A reference in [1mbold text[3][0m keeps the style of the text, and
+a table cell can hold one too:
+
+[1mFeature[0m   │ [1mNotes[0m
+──────────┼─────────────────────────
+Footnotes │ A reference in a cell[4]
+
+A reference without a definition[^missing] stays as written.
+
+[2m────────────────────────────────────────────────────────────[0m
+
+[2m1. [0mThis definition is long enough to wrap at every width of
+   the golden files, and its wrapped lines start at the item
+   text, not at the number.
+
+[2m2. [0mA numeric label, defined in the middle of the document.
+
+[2m3. [0mThe number is bold here.
+
+[2m4. [0mA note with two paragraphs and a code block.
+
+   The second paragraph is indented like the first one:
+
+   termd --width [38;2;165;214;255m40[0m doc.md

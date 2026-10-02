@@ -45,9 +45,9 @@ var (
 	markerStyle = style.Style{Faint: true}
 )
 
-// Parse parses src as CommonMark with the GFM extensions.
+// Parse parses src as CommonMark with the GFM extensions and footnotes.
 func Parse(src []byte) ast.Node {
-	md := goldmark.New(goldmark.WithExtensions(extension.GFM))
+	md := goldmark.New(goldmark.WithExtensions(extension.GFM, extension.Footnote))
 	return md.Parser().Parse(gtext.NewReader(src))
 }
 
@@ -147,7 +147,7 @@ func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 	case *ast.Paragraph, *ast.TextBlock:
 		return Block{Lines: text.Wrap(r.inlines(n, style.Style{}), width, true)}, true
 	case *ast.ThematicBreak:
-		return Block{Lines: []text.Line{{{Text: strings.Repeat("─", width), Style: markerStyle}}}}, true
+		return rule(width), true
 	case *ast.FencedCodeBlock:
 		info := ""
 		if n.Info != nil {
@@ -168,12 +168,19 @@ func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 		return r.quote(n, width), true
 	case *east.Table:
 		return r.table(n, width), true
+	case *east.FootnoteList:
+		return r.footnotes(n, width), true
 	}
 	if n.HasChildren() {
 		blocks := r.blocks(n, width)
 		return Block{Lines: join(blocks, true), Wide: anyWide(blocks)}, true
 	}
 	return Block{}, false
+}
+
+// rule is the horizontal line of a thematic break.
+func rule(width int) Block {
+	return Block{Lines: []text.Line{{{Text: strings.Repeat("─", width), Style: markerStyle}}}}
 }
 
 func anyWide(blocks []Block) bool {
@@ -240,6 +247,13 @@ func (r *renderer) list(n *ast.List, width int) Block {
 			markers = append(markers, "•")
 		}
 	}
+	return r.items(n, markers, n.IsTight, width)
+}
+
+// items lays out the children of parent as list items with the markers
+// aligned to the right. A loose list separates the items and the blocks
+// inside them with a blank line.
+func (r *renderer) items(parent ast.Node, markers []string, tight bool, width int) Block {
 	markerWidth := 0
 	for _, m := range markers {
 		markerWidth = max(markerWidth, text.Width(m))
@@ -248,13 +262,13 @@ func (r *renderer) list(n *ast.List, width int) Block {
 
 	var b Block
 	i := 0
-	for item := n.FirstChild(); item != nil; item = item.NextSibling() {
-		if i > 0 && !n.IsTight {
+	for item := parent.FirstChild(); item != nil; item = item.NextSibling() {
+		if i > 0 && !tight {
 			b.Lines = append(b.Lines, text.Line{})
 		}
 		children := r.blocks(item, width-indent)
 		b.Wide = b.Wide || anyWide(children)
-		lines := join(children, !n.IsTight)
+		lines := join(children, !tight)
 		if len(lines) == 0 {
 			lines = []text.Line{{}}
 		}
@@ -380,6 +394,27 @@ func (r *renderer) table(n *east.Table, width int) Block {
 	return Block{Lines: lines, Wide: wide}
 }
 
+// footnotes renders the footnote definitions after a horizontal line as a
+// numbered list. goldmark keeps only the referenced definitions, ordered by
+// their numbers. Like a markdown list, the list is loose when a definition
+// has more than one block.
+func (r *renderer) footnotes(n *east.FootnoteList, width int) Block {
+	var markers []string
+	tight := true
+	for fn := n.FirstChild(); fn != nil; fn = fn.NextSibling() {
+		markers = append(markers, strconv.Itoa(fn.(*east.Footnote).Index)+".")
+		blocks := 0
+		for c := fn.FirstChild(); c != nil; c = c.NextSibling() {
+			if _, ok := c.(*east.FootnoteBacklink); !ok {
+				blocks++
+			}
+		}
+		tight = tight && blocks <= 1
+	}
+	list := r.items(n, markers, tight, width)
+	return Block{Lines: join([]Block{rule(width), list}, true), Wide: list.Wide}
+}
+
 // inlines renders the inline children of n on top of the base style st.
 func (r *renderer) inlines(n ast.Node, st style.Style) []text.Span {
 	var out []text.Span
@@ -451,6 +486,12 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 			return []text.Span{{Text: "[x] ", Style: st}}
 		}
 		return []text.Span{{Text: "[ ] ", Style: st}}
+	case *east.FootnoteLink:
+		// Not a hyperlink: a terminal link cannot jump to the definition.
+		return []text.Span{{Text: "[" + strconv.Itoa(n.Index) + "]", Style: st}}
+	case *east.FootnoteBacklink:
+		// Back-references are not shown.
+		return nil
 	}
 	return r.inlines(n, st)
 }

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"runtime/debug"
 	"slices"
@@ -24,10 +25,11 @@ import (
 	"github.com/ekalinin/termd/internal/termbg"
 )
 
-const usage = `Usage: termd [flags] [FILE]
+const usage = `Usage: termd [flags] [FILE | DIR]
 
-Render a markdown document in the terminal. With no FILE, or when FILE is -,
-the document is read from standard input.
+Render a markdown document in the terminal. For a directory DIR, its
+README.md, README.markdown or README is rendered. With no FILE, or when FILE
+is -, the document is read from standard input.
 
 Flags:
 `
@@ -49,6 +51,8 @@ type env struct {
 	size     func() (width, height int, ok bool)
 	getenv   func(string) string
 	readFile func(string) ([]byte, error)
+	stat     func(string) (os.FileInfo, error)
+	readDir  func(string) ([]os.DirEntry, error)
 	lookPath func(string) (string, error)
 	// runPager shows content in the pager; it returns an error only when the
 	// pager could not be started.
@@ -76,6 +80,8 @@ func systemEnv() env {
 		},
 		getenv:      os.Getenv,
 		readFile:    os.ReadFile,
+		stat:        os.Stat,
+		readDir:     os.ReadDir,
 		lookPath:    exec.LookPath,
 		runPager:    runLess,
 		detectLight: func() (bool, bool) { return termbg.Light(themeQueryTimeout) },
@@ -137,11 +143,14 @@ func run(args []string, e env) int {
 		return usageError("expected at most one file, got %d", fs.NArg())
 	}
 
+	var file string // the path that is read; empty for stdin
 	var src []byte
 	var err error
 	switch {
 	case fs.NArg() == 1 && fs.Arg(0) != "-":
-		src, err = e.readFile(fs.Arg(0))
+		if file, err = inputPath(fs.Arg(0), e.stat, e.readDir); err == nil {
+			src, err = e.readFile(file)
+		}
 	case fs.NArg() == 1 || !e.stdinTTY:
 		src, err = io.ReadAll(e.stdin)
 	default:
@@ -175,6 +184,36 @@ func run(args []string, e env) int {
 	}
 	io.WriteString(e.stdout, out)
 	return 0
+}
+
+// readmeNames are the names of a directory's README, compared
+// case-insensitively; the first one found is used.
+var readmeNames = []string{"README.md", "README.markdown", "README"}
+
+// inputPath returns the file to read for the argument: the argument itself,
+// or the README in it when it is a directory. Subdirectories are not searched.
+func inputPath(arg string, stat func(string) (os.FileInfo, error), readDir func(string) ([]os.DirEntry, error)) (string, error) {
+	if info, err := stat(arg); err != nil || !info.IsDir() {
+		// Reading the file reports a missing or unreadable one.
+		return arg, nil
+	}
+	entries, err := readDir(arg)
+	if err != nil {
+		return "", err
+	}
+	for _, name := range readmeNames {
+		for _, entry := range entries {
+			if !strings.EqualFold(entry.Name(), name) {
+				continue
+			}
+			// Only a regular file counts, also through a symbolic link.
+			path := filepath.Join(arg, entry.Name())
+			if info, err := stat(path); err == nil && info.Mode().IsRegular() {
+				return path, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no README in %s", arg)
 }
 
 // outputWidth picks the layout width: the flag, then the terminal width,

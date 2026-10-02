@@ -3,6 +3,7 @@ package render
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,7 +38,7 @@ func renderLines(src string, opts Options) []string {
 }
 
 func TestParseGFM(t *testing.T) {
-	src := "| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~text~~ https://example.com\n"
+	src := "| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~text~~ https://example.com\n\nText[^1].\n\n[^1]: Note.\n"
 	found := map[string]bool{}
 	_ = ast.Walk(Parse([]byte(src)), func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
@@ -50,11 +51,15 @@ func TestParseGFM(t *testing.T) {
 				found["strikethrough"] = true
 			case *ast.AutoLink:
 				found["autolink"] = true
+			case *east.FootnoteLink:
+				found["footnote reference"] = true
+			case *east.FootnoteList:
+				found["footnote list"] = true
 			}
 		}
 		return ast.WalkContinue, nil
 	})
-	for _, k := range []string{"table", "task", "strikethrough", "autolink"} {
+	for _, k := range []string{"table", "task", "strikethrough", "autolink", "footnote reference", "footnote list"} {
 		if !found[k] {
 			t.Errorf("no %s node in the AST", k)
 		}
@@ -691,5 +696,85 @@ func TestDecodedControlCharacters(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// footnoteBug was rendered as "Text^1 (Note.)." when [^1]: Note. was parsed
+// as a link reference definition.
+const footnoteBug = "Text[^1].\n\n[^1]: Note.\n"
+
+func TestFootnoteReferences(t *testing.T) {
+	tests := []struct {
+		name, src, first string
+	}{
+		{"bug case", footnoteBug, "Text[1]."},
+		{"numbered by first reference", "A[^b] B[^a] C[^b]\n\n[^a]: Alpha.\n[^b]: Beta.\n", "A[1] B[2] C[1]"},
+		{"undefined reference", "Text[^x].\n", "Text[^x]."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := renderLines(tt.src, plain(40))[0]; got != tt.first {
+				t.Errorf("first line = %q, want %q", got, tt.first)
+			}
+		})
+	}
+	if out := Render([]byte(footnoteBug), plain(40)); strings.Contains(out, "^1") || strings.Contains(out, "(Note.)") {
+		t.Errorf("definition rendered as a link: %q", out)
+	}
+	out := Render([]byte(footnoteBug), styled(40))
+	if !strings.Contains(out, "[1]") || strings.Contains(out, "\x1b]8;") {
+		t.Errorf("styled reference = %q", out)
+	}
+}
+
+func TestFootnotes(t *testing.T) {
+	line := strings.Repeat("─", 40)
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"bug case", footnoteBug, []string{"Text[1].", "", line, "", "1. Note."}},
+		{
+			"numbered by first reference",
+			"A[^b] B[^a] C[^b]\n\n[^a]: Alpha.\n[^b]: Beta.\n",
+			[]string{"A[1] B[2] C[1]", "", line, "", "1. Beta.", "2. Alpha."},
+		},
+		{
+			"definition in the middle",
+			"First[^1].\n\n[^1]: Note.\n\nLast.\n",
+			[]string{"First[1].", "", "Last.", "", line, "", "1. Note."},
+		},
+		{
+			"unreferenced definition",
+			"Text[^1].\n\n[^1]: Used.\n[^2]: Unused.\n",
+			[]string{"Text[1].", "", line, "", "1. Used."},
+		},
+		{"no referenced definition", "Text.\n\n[^1]: Unused.\n", []string{"Text."}},
+		{
+			"two paragraphs",
+			"Text[^1].\n\n[^1]: First paragraph.\n\n    Second paragraph.\n",
+			[]string{"Text[1].", "", line, "", "1. First paragraph.", "", "   Second paragraph."},
+		},
+		{
+			"long definition",
+			"Text[^1].\n\n[^1]: one two three four five six seven eight nine ten eleven twelve.\n",
+			[]string{"Text[1].", "", line, "", "1. one two three four five six seven", "   eight nine ten eleven twelve."},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := renderLines(tt.src, plain(40))
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
+			}
+		})
+	}
+}
+
+func TestFootnotesWithFrontmatter(t *testing.T) {
+	got := renderLines("---\ntitle: Doc\n---\n"+footnoteBug, plain(40))
+	if got[0] != "title │ Doc" || !slices.Contains(got, "Text[1].") || got[len(got)-1] != "1. Note." {
+		t.Errorf("got %q", got)
 	}
 }

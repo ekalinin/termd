@@ -182,6 +182,22 @@ func TestPipeOutput(t *testing.T) {
 	}
 }
 
+func TestPipeOutputWithControlCharacters(t *testing.T) {
+	f := &fake{stdin: "hello \x1b[31mRED\x1b[0m and \x1b]0;pwned\x07 title\n"}
+	if code := f.run(); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	out := f.stdout.String()
+	if strings.ContainsAny(out, "\x1b\x07") {
+		t.Errorf("piped output contains ESC or BEL: %q", out)
+	}
+	for _, want := range []string{"␛[31m", "␛]0;pwned␇"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("piped output %q lacks %q", out, want)
+		}
+	}
+}
+
 func TestTerminalOutput(t *testing.T) {
 	t.Run("terminal width and styles", func(t *testing.T) {
 		f := &fake{stdin: "**bold**\n\n" + longParagraph, stdoutTTY: true, width: 100, height: 1000}

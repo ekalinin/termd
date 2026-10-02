@@ -103,6 +103,10 @@ A diagram type that is not supported yet:
 
 In a terminal, termd lays the document out for the terminal width and emits styles, colors and hyperlinks. When stdout is not a terminal, it uses 80 columns and emits plain text. `--width` overrides the width in both cases, and `--hyperlinks=always` forces hyperlinks into a pipe.
 
+### Control characters
+
+The control characters of a document reach the terminal as visible characters, so a document cannot change the window title, write the clipboard or redraw the screen. Every C0 control character except tab and line feed, and DEL, is shown as its Unicode control picture, one column wide: ESC as `␛`, BEL as `␇`, NUL as `␀`, DEL as `␡`. C1 control characters and bytes that are not valid UTF-8 are shown as `�`. This applies to all text of the document, including code blocks, link destinations, frontmatter and diagrams, and to control characters written as character references (`&#27;`) or YAML escapes (`"\e"`). CRLF and a lone CR are line endings, as in CommonMark. The styles and hyperlinks termd emits itself do not change.
+
 ### Paging
 
 When stdout is a terminal and the output is taller than the screen, or has a line wider than the screen, termd shows it in `less -RS`: `-R` passes styles and hyperlinks through, `-S` keeps wide tables and diagrams unwrapped so they scroll horizontally with the arrow keys. `$PAGER` is not used, because a pager without these two behaviors breaks wide blocks and links.

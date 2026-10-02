@@ -8,6 +8,7 @@ Existing terminal viewers often break tables (truncated headers, words split in 
 
 - **Tables** - widths are measured by grapheme clusters, so emoji (including ZWJ sequences and variation selectors) and CJK text keep columns aligned. Words are never split, headers are never truncated, and free width goes to the columns with long text. Column alignment from the markdown source is kept. A table that does not fit even at its minimum widths is emitted in full and can be scrolled horizontally in the pager.
 - **Mermaid diagrams as text** - `sequenceDiagram`, `flowchart`/`graph` and `erDiagram` are drawn with box-drawing characters. Any other diagram is shown as its source in a labelled frame instead of failing.
+- **Frontmatter** - a YAML frontmatter block is shown as a table of its keys and values at the top of the document.
 - **Syntax highlighting** - fenced code blocks with a known language are highlighted, with a dark or light theme chosen by the terminal background.
 - **Clickable links** - links are OSC 8 terminal hyperlinks, so a table cell shows `docs` instead of a long URL.
 - **Paging** - long or wide output opens in `less -RS`.
@@ -128,6 +129,12 @@ A frontmatter `title` is printed above the diagram. A flowchart that is too wide
 
 Everything else (other mermaid types, PlantUML, a diagram with a syntax error) is shown as source in a frame labelled with the language, the diagram type and the reason. One broken diagram never stops the rest of the document from rendering.
 
+### Frontmatter
+
+A document whose first line is `---`, which has a closing `---` or `...` line and holds a YAML mapping between them, starts with a table of the keys and their values, in source order and without a header row. A list is shown as its items separated by commas, a nested mapping as one `key: value` line per entry, a multi-line string with its line breaks, and deeper nesting as one-line YAML. The table is laid out like any other table.
+
+A block that is not valid YAML is shown as source in a frame labelled `frontmatter - invalid YAML`, and the rest of the document is rendered as usual. An empty or comment-only block is omitted. Anything else that starts with `---`, for example a horizontal rule followed by text, is rendered as markdown.
+
 ## Limitations
 
 - `stateDiagram`, `mindmap`, `classDiagram`, `gantt` and PlantUML are shown as source.
@@ -137,6 +144,7 @@ Everything else (other mermaid types, PlantUML, a diagram with a syntax error) i
 - In plain mode a long URL is an unbreakable word and can push a table beyond the output width.
 - GNU screen does not support hyperlinks; use `--hyperlinks=never` there.
 - Background detection works on macOS, Linux and the BSDs; elsewhere the dark theme is used unless `--theme` is given.
+- TOML (`+++`) frontmatter is rendered as markdown.
 
 ## Roadmap
 

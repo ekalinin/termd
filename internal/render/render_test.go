@@ -237,6 +237,103 @@ func TestHyperlinks(t *testing.T) {
 	}
 }
 
+func TestSplitFrontmatter(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		kind fmKind
+		// fmSrc is the block between the delimiters, body what is left to
+		// render as markdown.
+		fmSrc string
+		body  string
+	}{
+		{"mapping", "---\ntitle: Doc\n---\n# Hello\n", fmTable, "title: Doc\n", "# Hello\n"},
+		{"dots closing line", "---\ntitle: Doc\n...\n# Hello\n", fmTable, "title: Doc\n", "# Hello\n"},
+		{"trailing spaces", "--- \ntitle: Doc\n---  \n# Hello\n", fmTable, "title: Doc\n", "# Hello\n"},
+		{"no body", "---\ntitle: Doc\n---", fmTable, "title: Doc\n", ""},
+		{"empty block", "---\n---\n# Hello\n", fmEmpty, "", "# Hello\n"},
+		{"comments only", "---\n# just a comment\n---\n# Hello\n", fmEmpty, "# just a comment\n", "# Hello\n"},
+		{"scalar block", "---\nSome text\n---\n", fmNone, "", "---\nSome text\n---\n"},
+		{"no closing line", "---\ntitle: Doc\n\n# Hello\n", fmNone, "", "---\ntitle: Doc\n\n# Hello\n"},
+		{"not the first line", "Intro\n\n---\ntitle: Doc\n---\n", fmNone, "", "Intro\n\n---\ntitle: Doc\n---\n"},
+		{"longer opening line", "----\ntitle: Doc\n---\n", fmNone, "", "----\ntitle: Doc\n---\n"},
+		{"bom and crlf", "\ufeff---\r\ntitle: Doc\r\n---\r\n# Hello\r\n", fmTable, "title: Doc\n", "# Hello\r\n"},
+		{"invalid yaml", "---\ntitle: [unclosed\n---\n# Hello\n", fmInvalid, "title: [unclosed\n", "# Hello\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fm, body := splitFrontmatter([]byte(tt.src))
+			if fm.kind != tt.kind {
+				t.Errorf("kind = %v, want %v", fm.kind, tt.kind)
+			}
+			if fm.src != tt.fmSrc {
+				t.Errorf("frontmatter source = %q, want %q", fm.src, tt.fmSrc)
+			}
+			if string(body) != tt.body {
+				t.Errorf("body = %q, want %q", body, tt.body)
+			}
+			if (fm.root != nil) != (tt.kind == fmTable) {
+				t.Errorf("root = %v for kind %v", fm.root, fm.kind)
+			}
+		})
+	}
+}
+
+const frontmatterValues = "---\n" +
+	"title: \"Doc: x\"\n" +
+	"desc: |\n  line one\n  line two\n" +
+	"tags: [a, b]\n" +
+	"author:\n  name: Eugene\n  url: https://example.com\n" +
+	"authors:\n  - name: A\n  - name: B\n" +
+	"empty:\n" +
+	"---\n# Hello\n"
+
+func TestFrontmatterValues(t *testing.T) {
+	got := renderLines(frontmatterValues, plain(80))
+	want := []string{
+		"title   │ Doc: x",
+		"desc    │ line one",
+		"        │ line two",
+		"tags    │ a, b",
+		"author  │ name: Eugene",
+		"        │ url: https://example.com",
+		"authors │ [{name: A}, {name: B}]",
+		"empty   │",
+		"",
+		"# Hello",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestFrontmatterStyles(t *testing.T) {
+	if out := Render([]byte(frontmatterValues), styled(80)); !strings.Contains(out, "\x1b[1mtitle") {
+		t.Errorf("key is not bold: %q", out)
+	}
+	if out := Render([]byte(frontmatterValues), plain(80)); strings.ContainsRune(out, 0x1b) {
+		t.Errorf("plain frontmatter contains ESC: %q", out)
+	}
+}
+
+func TestInvalidFrontmatter(t *testing.T) {
+	got := renderLines("---\ntitle: [unclosed\n---\n# Hello\n", plain(80))
+	want := []string{
+		"┌─ frontmatter - invalid YAML ┐",
+		"│ title: [unclosed            │",
+		"└─────────────────────────────┘",
+		"",
+		"# Hello",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	fm, _ := splitFrontmatter([]byte("---\ntitle: [unclosed\n---\n"))
+	if b, _ := frontmatterBlock(fm, 20); !b.Wide {
+		t.Error("frame wider than the output is not marked wide")
+	}
+}
+
 func TestTableCells(t *testing.T) {
 	url := "https://example.com/very/long/path/to/documentation/page"
 	src := "| Ссылка | Код |\n|---|---|\n| [docs](" + url + ") | `code \\| pipe` |\n"

@@ -23,7 +23,8 @@ const (
 type Cell []text.Span
 
 // Table holds the cells of a GFM table. The header defines the number of
-// columns.
+// columns. A table without a header takes the number of columns from its
+// widest row and is rendered without a header line and rule.
 type Table struct {
 	Header []Cell
 	Rows   [][]Cell
@@ -46,12 +47,24 @@ func cell(row []Cell, i int) Cell {
 	return nil
 }
 
+// columns returns the number of columns and the rows to measure: the header
+// and the body, or only the body when there is no header.
+func (t Table) columns() (int, [][]Cell) {
+	if len(t.Header) > 0 {
+		return len(t.Header), append([][]Cell{t.Header}, t.Rows...)
+	}
+	n := 0
+	for _, row := range t.Rows {
+		n = max(n, len(row))
+	}
+	return n, t.Rows
+}
+
 // Measure returns the minimum (widest word) and natural (one line) width of
 // every column.
 func (t Table) Measure() (mins, naturals []int) {
-	n := len(t.Header)
+	n, rows := t.columns()
 	mins, naturals = make([]int, n), make([]int, n)
-	rows := append([][]Cell{t.Header}, t.Rows...)
 	for _, row := range rows {
 		for i := range n {
 			c := cell(row, i)
@@ -152,17 +165,19 @@ func (t Table) Render(width int) (lines []text.Line, wide bool) {
 	if len(widths) == 0 {
 		return nil, false
 	}
-	header := make([]Cell, len(t.Header))
-	for i, c := range t.Header {
-		header[i] = withStyle(c, headerStyle)
-	}
-	lines = append(lines, t.row(header, widths)...)
+	if len(t.Header) > 0 {
+		header := make([]Cell, len(t.Header))
+		for i, c := range t.Header {
+			header[i] = withStyle(c, headerStyle)
+		}
+		lines = append(lines, t.row(header, widths)...)
 
-	parts := make([]string, len(widths))
-	for i, w := range widths {
-		parts[i] = strings.Repeat("─", w)
+		parts := make([]string, len(widths))
+		for i, w := range widths {
+			parts[i] = strings.Repeat("─", w)
+		}
+		lines = append(lines, text.Plain(strings.Join(parts, ruleSep)))
 	}
-	lines = append(lines, text.Plain(strings.Join(parts, ruleSep)))
 
 	for _, row := range t.Rows {
 		lines = append(lines, t.row(row, widths)...)

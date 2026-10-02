@@ -385,3 +385,15 @@ func TestUnsupportedDiagramExitsZero(t *testing.T) {
 		t.Errorf("output %q", out)
 	}
 }
+
+func TestInvalidFrontmatterExitsZero(t *testing.T) {
+	path := writeFile(t, "---\ntitle: [unclosed\n---\n\nAfter.\n")
+	f := &fake{stdinTTY: true}
+	if code := f.run(path); code != 0 {
+		t.Errorf("exit %d, want 0", code)
+	}
+	out := f.stdout.String()
+	if !strings.Contains(out, "frontmatter - invalid YAML") || !strings.Contains(out, "After.") {
+		t.Errorf("output %q", out)
+	}
+}

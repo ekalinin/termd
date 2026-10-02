@@ -38,6 +38,7 @@ make build    # produces ./termd
 
 ```sh
 termd README.md             # render a file
+termd docs/                 # render the README of a directory
 cat README.md | termd       # render standard input
 termd - < README.md         # same, explicitly
 termd --width 60 doc.md     # lay out for 60 columns

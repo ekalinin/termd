@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/rivo/uniseg"
 )
@@ -43,6 +45,8 @@ func (f *fake) env() env {
 			return ""
 		},
 		readFile: os.ReadFile,
+		stat:     os.Stat,
+		readDir:  os.ReadDir,
 		lookPath: func(name string) (string, error) {
 			if f.hasLess && name == "less" {
 				return "/usr/bin/less", nil
@@ -71,6 +75,29 @@ func writeFile(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// writeDir creates a temp directory with the given entries: a name ending in
+// / is a directory, any other name a file holding the heading "# <name>".
+func writeDir(t *testing.T, names ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, name := range names {
+		path := filepath.Join(dir, name)
+		if strings.HasSuffix(name, "/") {
+			if err := os.MkdirAll(path, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("# "+name+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
 }
 
 var longParagraph = strings.Repeat("words that wrap ", 40) + "\n"
@@ -135,6 +162,143 @@ func TestInputSources(t *testing.T) {
 			t.Errorf("exit %d, stderr %q", code, f.stderr.String())
 		}
 	})
+}
+
+func TestDirectoryInput(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		files []string
+		want  string
+	}{
+		{"README next to other files", []string{"README.md", "guide.md"}, "README.md"},
+		{"README.md before the others", []string{"README", "README.markdown", "README.md"}, "README.md"},
+		{"README.markdown before README", []string{"README", "README.markdown"}, "README.markdown"},
+		{"lowercase name", []string{"readme.md"}, "readme.md"},
+		{"directory named README.md", []string{"README.md/", "README"}, "README"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fake{stdinTTY: true}
+			code := f.run(writeDir(t, tt.files...))
+			if want := "# " + tt.want + "\n"; code != 0 || f.stdout.String() != want {
+				t.Errorf("exit %d, stdout %q, want %q; stderr %q", code, f.stdout.String(), want, f.stderr.String())
+			}
+		})
+	}
+	for _, tt := range []struct {
+		name  string
+		files []string
+	}{
+		{"README only in a subdirectory", []string{"guide/README.md"}},
+		{"no README", []string{"guide.md"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := writeDir(t, tt.files...) + string(filepath.Separator)
+			f := &fake{stdinTTY: true}
+			code := f.run(dir)
+			if want := "termd: no README in " + dir + "\n"; code != 1 || f.stdout.Len() != 0 || f.stderr.String() != want {
+				t.Errorf("exit %d, stdout %q, stderr %q, want %q", code, f.stdout.String(), f.stderr.String(), want)
+			}
+		})
+	}
+}
+
+func TestDirectorySymlinks(t *testing.T) {
+	symlink := func(t *testing.T, target, link string) {
+		t.Helper()
+		if err := os.Symlink(target, link); err != nil {
+			t.Skipf("cannot create a symbolic link: %v", err)
+		}
+	}
+	t.Run("link to a directory", func(t *testing.T) {
+		dir := writeDir(t, "docs/README.md")
+		link := filepath.Join(dir, "link")
+		symlink(t, "docs", link)
+		f := &fake{stdinTTY: true}
+		if code := f.run(link); code != 0 || f.stdout.String() != "# docs/README.md\n" {
+			t.Errorf("exit %d, stdout %q, stderr %q", code, f.stdout.String(), f.stderr.String())
+		}
+	})
+	t.Run("README linked to a file", func(t *testing.T) {
+		dir := writeDir(t, "README.md", "docs/")
+		symlink(t, filepath.Join("..", "README.md"), filepath.Join(dir, "docs", "README.md"))
+		f := &fake{stdinTTY: true}
+		if code := f.run(filepath.Join(dir, "docs")); code != 0 || f.stdout.String() != "# README.md\n" {
+			t.Errorf("exit %d, stdout %q, stderr %q", code, f.stdout.String(), f.stderr.String())
+		}
+	})
+	t.Run("broken README link is skipped", func(t *testing.T) {
+		dir := writeDir(t, "README")
+		symlink(t, "missing.md", filepath.Join(dir, "README.md"))
+		f := &fake{stdinTTY: true}
+		if code := f.run(dir); code != 0 || f.stdout.String() != "# README\n" {
+			t.Errorf("exit %d, stdout %q, stderr %q", code, f.stdout.String(), f.stderr.String())
+		}
+	})
+}
+
+func TestDirectoryCaseVariants(t *testing.T) {
+	// A case-insensitive file system cannot hold both names, so the
+	// directory is faked.
+	m := fstest.MapFS{
+		"docs/readme.md": {Data: []byte("# lower\n")},
+		"docs/README.md": {Data: []byte("# upper\n")},
+	}
+	f := &fake{stdinTTY: true}
+	e := f.env()
+	e.stat = func(name string) (os.FileInfo, error) { return fs.Stat(m, filepath.ToSlash(name)) }
+	e.readDir = func(name string) ([]os.DirEntry, error) { return fs.ReadDir(m, filepath.ToSlash(name)) }
+	e.readFile = func(name string) ([]byte, error) { return fs.ReadFile(m, filepath.ToSlash(name)) }
+	if code := run([]string{"docs"}, e); code != 0 || f.stdout.String() != "# upper\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, f.stdout.String(), f.stderr.String())
+	}
+}
+
+func TestDirectoryReadErrors(t *testing.T) {
+	t.Run("unreadable README", func(t *testing.T) {
+		dir := writeDir(t, "README.md", "README")
+		readme := filepath.Join(dir, "README.md")
+		f := &fake{stdinTTY: true}
+		e := f.env()
+		e.readFile = func(name string) ([]byte, error) {
+			if name == readme {
+				return nil, &os.PathError{Op: "open", Path: name, Err: os.ErrPermission}
+			}
+			return os.ReadFile(name)
+		}
+		if code := run([]string{dir}, e); code != 1 || f.stdout.Len() != 0 || !strings.Contains(f.stderr.String(), readme) {
+			t.Errorf("exit %d, stdout %q, stderr %q", code, f.stdout.String(), f.stderr.String())
+		}
+	})
+	t.Run("directory cannot be listed", func(t *testing.T) {
+		dir := writeDir(t, "README.md")
+		f := &fake{stdinTTY: true}
+		e := f.env()
+		e.readDir = func(name string) ([]os.DirEntry, error) {
+			return nil, &os.PathError{Op: "open", Path: name, Err: os.ErrPermission}
+		}
+		if code, want := run([]string{dir}, e), "termd: open "+dir+": permission denied\n"; code != 1 || f.stderr.String() != want {
+			t.Errorf("exit %d, stderr %q, want %q", code, f.stderr.String(), want)
+		}
+	})
+}
+
+func TestDirectoryRendersAsFile(t *testing.T) {
+	dir := t.TempDir()
+	readme := filepath.Join(dir, "README.md")
+	if err := os.WriteFile(readme, []byte(strings.Repeat("**bold** "+longParagraph+"\n", 5)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var pages []string
+	for _, arg := range []string{dir, readme} {
+		f := &fake{stdoutTTY: true, width: 80, height: 24, hasLess: true}
+		if code := f.run("--width", "60", arg); code != 0 || len(f.pagerCalls) != 1 || f.stdout.Len() != 0 {
+			t.Fatalf("%s: exit %d, pager calls %d, stdout %q, stderr %q", arg, code, len(f.pagerCalls), f.stdout.String(), f.stderr.String())
+		}
+		pages = append(pages, f.pagerCalls[0])
+	}
+	if pages[0] != pages[1] {
+		t.Errorf("directory:\n%s\nREADME:\n%s", pages[0], pages[1])
+	}
 }
 
 func TestVersion(t *testing.T) {

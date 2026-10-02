@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 
@@ -47,9 +48,10 @@ func Parse(src []byte) ast.Node {
 }
 
 // Render lays out a markdown document and returns the terminal output. A
-// leading YAML frontmatter block is shown before the document.
+// leading YAML frontmatter block is shown before the document. Control
+// characters of the document are shown as visible characters.
 func Render(src []byte, opts Options) string {
-	fm, body := splitFrontmatter(src)
+	fm, body := splitFrontmatter(cleanSource(src))
 	r := &renderer{src: body, opts: opts}
 	var blocks []Block
 	if b, ok := frontmatterBlock(fm, opts.Width); ok {
@@ -450,9 +452,10 @@ func (r *renderer) plainText(n ast.Node, raw bool) string {
 }
 
 // unescape resolves backslash escapes and character references the way the
-// HTML renderer of goldmark does.
+// HTML renderer of goldmark does. A reference to a control character, for
+// example &#27;, gives its control picture, as in the source.
 func unescape(v []byte) []byte {
 	v = util.UnescapePunctuations(v)
 	v = util.ResolveNumericReferences(v)
-	return util.ResolveEntityNames(v)
+	return bytes.Map(controlPicture, util.ResolveEntityNames(v))
 }

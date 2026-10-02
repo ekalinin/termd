@@ -422,3 +422,142 @@ func TestTableCells(t *testing.T) {
 		t.Errorf("escaped pipe changed the number of columns: %q", lines[0])
 	}
 }
+
+// sameWidth reports whether all lines are equally wide.
+func sameWidth(lines []string) bool {
+	for _, l := range lines {
+		if text.Width(l) != text.Width(lines[0]) {
+			return false
+		}
+	}
+	return true
+}
+
+// column returns the display column at which sep starts in line, or -1.
+func column(line, sep string) int {
+	i := strings.Index(line, sep)
+	if i < 0 {
+		return -1
+	}
+	return text.Width(line[:i])
+}
+
+func TestControlCharacters(t *testing.T) {
+	linksOnly := Options{Width: 80, Style: style.Options{Hyperlinks: true}}
+	tests := []struct {
+		name string
+		src  string
+		opts Options
+		want string
+	}{
+		{"paragraph", "hello \x1b[31mRED\x1b[0m and \x1b]0;pwned\x07 title\n", plain(80), "hello ␛[31mRED␛[0m and ␛]0;pwned␇ title\n"},
+		{"styled text", "**bold \x1b[31m**\n", styled(80), "\x1b[1mbold ␛[31m\x1b[0m\n"},
+		{"nul, del, c1 and invalid utf-8", "a\x00b\x7fc\u009bd\xffe\n", plain(80), "a␀b␡c�d�e\n"},
+		{"heading", "# Title \x1b[5m\n", plain(80), "# Title ␛[5m\n"},
+		{"plain code block", "```\necho \x07\n```\n", styled(80), "echo ␇\n"},
+		{"link with hyperlinks", "[docs](https://example.com/\x1b]0;pwned\x07)\n", linksOnly, "\x1b]8;;https://example.com/␛]0;pwned␇\x1b\\docs\x1b]8;;\x1b\\\n"},
+		{"link in a pipe", "[docs](https://example.com/\x1b]0;pwned\x07)\n", plain(80), "docs (https://example.com/␛]0;pwned␇)\n"},
+		{"image", "![alt\x1b\x07](x.png)\n", plain(80), "[image: alt␛␇] (x.png)\n"},
+		{"inline html", "<span>\x1b[31m</span>\n", plain(80), "<span>␛[31m</span>\n"},
+		{"html block", "<div>\n\x1b[31m\n</div>\n", plain(80), "<div>\n␛[31m\n</div>\n"},
+		{"frontmatter value", "---\nraw: a\x1bb\n---\n", plain(80), "raw │ a␛b\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Render([]byte(tt.src), tt.opts); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("highlighted code block", func(t *testing.T) {
+		out := Render([]byte("```go\nfmt.Println(\"\x1b[31m\")\n```\n"), styled(80))
+		if got := stripEscapes(out); got != "fmt.Println(\"␛[31m\")\n" {
+			t.Errorf("got %q", got)
+		}
+	})
+	t.Run("table", func(t *testing.T) {
+		got := renderLines("| Key | Value |\n|---|---|\n| a\x1bb | x |\n", plain(80))
+		if len(got) != 3 || !strings.HasPrefix(got[2], "a␛b │ x") {
+			t.Fatalf("got %q", got)
+		}
+		if column(got[0], "│") != 4 || column(got[1], "┼") != 4 || column(got[2], "│") != 4 {
+			t.Errorf("separators are not aligned: %q", got)
+		}
+	})
+	t.Run("invalid frontmatter", func(t *testing.T) {
+		got := renderLines("---\ntitle: [\x1b[31m\n---\n", plain(80))
+		if len(got) != 3 || !strings.HasPrefix(got[1], "│ title: [␛[31m ") || !sameWidth(got) {
+			t.Errorf("got %q", got)
+		}
+	})
+	t.Run("flowchart", func(t *testing.T) {
+		got := renderLines("```mermaid\ngraph LR\n  A[\x1b[31mStart] --> B[End]\n```\n", plain(80))
+		if len(got) < 3 || !strings.Contains(got[2], "│ ␛[31mStart ├") {
+			t.Fatalf("got %q", got)
+		}
+		if column(got[0], "┐") != column(got[2], "├") {
+			t.Errorf("box borders are not aligned: %q", got)
+		}
+	})
+	t.Run("unsupported diagram", func(t *testing.T) {
+		got := renderLines("```mermaid\nstateDiagram-v2\n  [*] --> \x1b[31mIdle\n```\n", plain(80))
+		if len(got) != 4 || !strings.Contains(got[2], "[*] --> ␛[31mIdle") || !sameWidth(got) {
+			t.Errorf("got %q", got)
+		}
+	})
+}
+
+func TestLineEndings(t *testing.T) {
+	lf := "first line\nsecond line\n\n```\ncode a\ncode b\n```\n\n```go\nx := 1\ny := 2\n```\n"
+	crlf := strings.ReplaceAll(lf, "\n", "\r\n")
+	for _, opts := range []Options{plain(80), styled(80)} {
+		got, want := Render([]byte(crlf), opts), Render([]byte(lf), opts)
+		if got != want || strings.Contains(got, "\r") {
+			t.Errorf("CRLF document rendered as %q, want %q", got, want)
+		}
+	}
+	if got := Render([]byte(lf), plain(80)); !strings.Contains(got, "first line second line\n\ncode a\ncode b\n") {
+		t.Errorf("LF document rendered as %q", got)
+	}
+	if got := Render([]byte("one\rtwo\n"), plain(80)); got != "one two\n" {
+		t.Errorf("lone CR in a paragraph rendered as %q", got)
+	}
+	if got := Render([]byte("```\nthree\rfour\n```\n"), plain(80)); got != "three\nfour\n" {
+		t.Errorf("lone CR in a code block rendered as %q", got)
+	}
+	got := renderLines("\ufeff---\r\ntitle: Doc\r\n---\r\n# Hello\r\n", plain(80))
+	want := []string{"title │ Doc", "", "# Hello"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("BOM and CRLF frontmatter rendered as %q, want %q", got, want)
+	}
+}
+
+func TestDecodedControlCharacters(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{"character references", "&#27;[31m red &#7; &#13; &#x9b;\n", "␛[31m red ␇ ␍ �\n"},
+		{"image alt", "![&#27;](x.png)\n", "[image: ␛] (x.png)\n"},
+		{"table cell", "| Key | Value |\n|---|---|\n| &#27; | x |\n", "Key │ Value\n────┼──────\n␛   │ x\n"},
+		{"yaml escapes", "---\n" +
+			"title: \"\\e]0;pwned\\a\"\n" +
+			"tags: [\"\\e\", b]\n" +
+			"\"\\a\": x\n" +
+			"nested: [{k: \"\\e\"}]\n" +
+			"---\n",
+			"title  │ ␛]0;pwned␇\n" +
+				"tags   │ ␛, b\n" +
+				"␇      │ x\n" +
+				"nested │ [{k: \"␛\"}]\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Render([]byte(tt.src), plain(80)); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

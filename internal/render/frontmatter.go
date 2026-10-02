@@ -119,6 +119,7 @@ func frontmatterBlock(fm frontmatter, width int) (b Block, ok bool) {
 	default:
 		return Block{}, false
 	}
+	cleanValues(fm.root)
 	var t table.Table
 	pairs := fm.root.Content
 	for i := 0; i+1 < len(pairs); i += 2 {
@@ -127,6 +128,15 @@ func frontmatterBlock(fm frontmatter, width int) (b Block, ok bool) {
 	}
 	lines, wide := t.Render(width)
 	return Block{Lines: lines, Wide: wide}, true
+}
+
+// cleanValues replaces the control characters that YAML escapes such as
+// "\e" put into the values of n and its descendants.
+func cleanValues(n *yaml.Node) {
+	n.Value = strings.Map(controlPicture, n.Value)
+	for _, c := range n.Content {
+		cleanValues(c)
+	}
 }
 
 // valueSpans formats a frontmatter value: a scalar as its text with its line

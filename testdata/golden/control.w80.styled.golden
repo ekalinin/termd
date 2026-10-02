@@ -1,0 +1,59 @@
+[1mtitle[0m │ ␛]0;title from YAML escapes␇
+[1mraw[0m   │ a raw ESC ␛ in a value
+
+[1m# Control characters, ESC [1m: ␛[1m[0m
+
+Every line of this document ends with CRLF. Each control character below is
+written as the raw byte, right after its name.
+
+A color sequence, ESC [31m and ESC [0m: ␛[31mred␛[0m. A window title sequence,
+ESC ]0; and BEL: ␛]0;pwned␇. DEL: ␡. The C1 control U+009B: �. The invalid byte
+0xFF: �.
+
+Character references &#27;, &#7; and &#x9b;: ␛[31m, ␇, �.
+
+This paragraph has a lone CR here: the text goes on after it.
+
+[1m## Table[0m
+
+[1mBytes[0m │ [1mCell[0m
+──────┼─────
+ESC   │ a␛b
+BEL   │ a␇b
+&#27; │ a␛b
+
+[1m## Links and images[0m
+
+]8;;https://example.com/␛]0;pwned␇\[4;34mA link with a title sequence, ESC and BEL, in the destination[0m]8;;\
+
+]8;;image.png\[4;34m[image: An image with ESC in the alt text: ␛][0m]8;;\
+
+[1m## HTML[0m
+
+Inline HTML with ESC [31m: <span>␛[31m</span>
+
+<div>
+An HTML block with ESC [31m: ␛[31m
+</div>
+
+[1m## Code[0m
+
+[3;38;2;139;148;158m// ESC [31m in a string, highlighted[0m
+fmt.[1;38;2;210;168;255mPrintln[0m([38;2;165;214;255m"␛[31m"[0m)
+
+plain code with BEL: ␇
+a lone CR follows:
+this is the next line
+
+[1m## Diagrams[0m
+
+┌────────────┐     ┌─────┐
+│            │     │     │
+│ ESC: ␛[31m ├────►│ End │
+│            │     │     │
+└────────────┘     └─────┘
+
+┌─ mermaid - stateDiagram-v2 - not supported ┐
+│ stateDiagram-v2                            │
+│     [*] --> ESC␛[31m                       │
+└────────────────────────────────────────────┘

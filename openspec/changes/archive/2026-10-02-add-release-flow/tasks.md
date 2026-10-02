@@ -29,5 +29,5 @@
 
 ## 6. After the merge
 
-- [ ] 6.1 The maintainer starts the first release with `gh workflow run release.yml -f version=<version>`; verify the run passes, the release has the six archives and `checksums.txt`, `git ls-remote --tags origin` shows the tag at the released commit, and `go install github.com/ekalinin/termd/cmd/termd@<version>` followed by `termd --version` prints `termd <version>`
-- [ ] 6.2 Verify that failed starts publish nothing: start the release again with the same version, and once for another branch (`--ref <branch>`); both runs fail in `validate` with the matching error, and no new tag or release appears
+- [x] 6.1 The maintainer starts the first release with `gh workflow run release.yml -f version=<version>`; verify the run passes, the release has the six archives and `checksums.txt`, `git ls-remote --tags origin` shows the tag at the released commit, and `go install github.com/ekalinin/termd/cmd/termd@<version>` followed by `termd --version` prints `termd <version>`
+- [x] 6.2 Verify that failed starts publish nothing: start the release again with the same version, and once for another branch (`--ref <branch>`); both runs fail in `validate` with the matching error, and no new tag or release appears

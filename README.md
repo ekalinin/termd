@@ -135,6 +135,10 @@ A document whose first line is `---`, which has a closing `---` or `...` line an
 
 A block that is not valid YAML is shown as source in a frame labelled `frontmatter - invalid YAML`, and the rest of the document is rendered as usual. An empty or comment-only block is omitted. Anything else that starts with `---`, for example a horizontal rule followed by text, is rendered as markdown.
 
+### Alerts
+
+A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, alone on the line and in any case, is shown as a GitHub alert: the marker line is replaced by the title `Note`, `Tip`, `Important`, `Warning` or `Caution`, and the rest of the quote follows under it. In a terminal the title is bold, and the title and the quote marker take the color of the alert type from the terminal palette: blue for a note, green for a tip, purple for important, yellow for a warning and red for a caution. In plain text the title follows the usual quote marker. A quote with another marker, such as `[!FOO]`, or with text after the marker on the same line stays a regular quote. Alerts have no icons, because terminals disagree on the width of emoji.
+
 ## Limitations
 
 - `stateDiagram`, `mindmap`, `classDiagram`, `gantt` and PlantUML are shown as source.

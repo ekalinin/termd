@@ -141,6 +141,75 @@ func TestBlockQuoteMarker(t *testing.T) {
 			t.Errorf("quote line %q", l)
 		}
 	}
+	alert := renderLines("> [!NOTE]\n"+src, plain(30))
+	if len(alert) < 4 || alert[0] != "│ Note" {
+		t.Fatalf("alert did not wrap: %q", alert)
+	}
+	for _, l := range alert {
+		if !strings.HasPrefix(l, "│ ") || text.Width(l) > 30 {
+			t.Errorf("alert line %q", l)
+		}
+	}
+}
+
+func TestAlerts(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"note", "> [!NOTE]\n> Useful info.\n", []string{"│ Note", "│ Useful info."}},
+		{"lower case", "> [!warning]\n> Careful.\n", []string{"│ Warning", "│ Careful."}},
+		{"hard line break", "> [!TIP]  \n> Hint.\n", []string{"│ Tip", "│ Hint."}},
+		{"marker only", "> [!TIP]\n", []string{"│ Tip"}},
+		{"several blocks", "> [!IMPORTANT]\n> First.\n>\n> Second.\n", []string{"│ Important", "│ First.", "│", "│ Second."}},
+		{"nested quote", "> [!NOTE]\n> Text.\n>\n> > Quoted.\n", []string{"│ Note", "│ Text.", "│", "│ │ Quoted."}},
+		{"list item", "- item\n  > [!TIP]\n  > Hint.\n", []string{"• item", "  │ Tip", "  │ Hint."}},
+		{"text after the marker", "> [!NOTE] Useful info.\n", []string{"│ [!NOTE] Useful info."}},
+		{"unknown marker", "> [!FOO]\n> Text.\n", []string{"│ [!FOO] Text."}},
+		{"escaped marker", "> \\[!NOTE]\n> Text.\n", []string{"│ [!NOTE] Text."}},
+		{"dotless i", "> [!tıp]\n> Text.\n", []string{"│ [!tıp] Text."}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := renderLines(tt.src, plain(80))
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAlertStyles(t *testing.T) {
+	tests := []struct {
+		marker, title, color string
+	}{
+		{"[!NOTE]", "Note", "34"},
+		{"[!TIP]", "Tip", "32"},
+		{"[!IMPORTANT]", "Important", "35"},
+		{"[!WARNING]", "Warning", "33"},
+		{"[!CAUTION]", "Caution", "31"},
+	}
+	for _, tt := range tests {
+		src := "> " + tt.marker + "\n> Text.\n>\n> More text.\n"
+		got := renderLines(src, styled(80))
+		marker := "\x1b[" + tt.color + "m│"
+		if want := marker + " \x1b[0m\x1b[1;" + tt.color + "m" + tt.title + "\x1b[0m"; got[0] != want {
+			t.Errorf("%s title line = %q, want %q", tt.marker, got[0], want)
+		}
+		for _, l := range got {
+			if !strings.HasPrefix(l, marker) {
+				t.Errorf("%s line %q does not start with %q", tt.marker, l, marker)
+			}
+		}
+		if out := Render([]byte(src), plain(80)); strings.ContainsRune(out, 0x1b) {
+			t.Errorf("plain %s contains ESC: %q", tt.marker, out)
+		}
+	}
+	got := renderLines("> [!NOTE]\n> Text.\n>\n> > Quoted.\n", styled(80))
+	if want := "\x1b[34m│ \x1b[0m\x1b[2m│ \x1b[0mQuoted."; got[3] != want {
+		t.Errorf("nested quote = %q, want %q", got[3], want)
+	}
 }
 
 func TestCodeBlockWhitespace(t *testing.T) {

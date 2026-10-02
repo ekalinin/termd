@@ -1,0 +1,11 @@
+[3;38;2;139;148;158m# Build and test the greet command.[0m
+[38;2;121;192;255mBINARY[0m [1;38;2;255;123;114m:=[0m greet
+
+[1;38;2;210;168;255m.PHONY[0m[1;38;2;255;123;114m:[0m build test
+
+[1;38;2;210;168;255mbuild[0m[1;38;2;255;123;114m:[0m [3;38;2;139;148;158m## Build the binary[0m
+	go build -o [38;2;255;123;114m$([0mBINARY[38;2;255;123;114m)[0m .
+
+[3;38;2;139;148;158m# Tests run with the race detector.[0m
+[1;38;2;210;168;255mtest[0m[1;38;2;255;123;114m:[0m
+	go test -race ./...

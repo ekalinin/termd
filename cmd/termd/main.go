@@ -176,7 +176,14 @@ func run(args []string, e env) int {
 		Theme: themeFunc(*theme, e.detectLight),
 		Dir:   docDir(file),
 	}
-	out := render.Render(src, opts)
+	// A file whose name the highlighter recognizes is shown as code; stdin is
+	// always markdown.
+	var out string
+	if file != "" && highlight.RecognizedFile(file) {
+		out = render.Code(src, file, opts)
+	} else {
+		out = render.Render(src, opts)
+	}
 
 	if path, ok := pagerPath(e.stdoutTTY, sizeOK, termWidth, termHeight, out, *noPager, e.lookPath); ok {
 		if err := e.runPager(path, out); err == nil {

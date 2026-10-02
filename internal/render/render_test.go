@@ -292,6 +292,66 @@ func TestThemeIsResolvedOnlyWhenNeeded(t *testing.T) {
 	}
 }
 
+func TestCode(t *testing.T) {
+	wide := strings.Repeat("0123456789", 12)
+	fence := "package main\n\n/*\n```\n# Title\n```\n*/\nfunc main() {}\n"
+	tests := []struct {
+		name, file, src, want string
+	}{
+		{"final line break", "x.go", "a\nb\n", "a\nb\n"},
+		{"no final line break", "x.go", "a\nb", "a\nb\n"},
+		{"trailing empty line", "x.go", "a\n\n", "a\n\n"},
+		{"empty file", "x.go", "", ""},
+		{"comments and dashes", "config.yaml", "---\n# Server settings\nport: 8080\n", "---\n# Server settings\nport: 8080\n"},
+		{"fence line", "main.go", fence, fence},
+		{"wide line", "x.go", wide + "\n", wide + "\n"},
+		{"control characters", "x.go", "a \x1b]0;x\x07 b\n", "a ␛]0;x␇ b\n"},
+		{"crlf and lone cr", "x.go", "a\r\nb\rc\n", "a\nb\nc\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Code([]byte(tt.src), tt.file, plain(80)); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+
+	src := "// main does nothing.\nfunc main() {}\n"
+	out := Code([]byte(src), "main.go", styled(80))
+	if !strings.Contains(out, "\x1b[") || stripEscapes(out) != src {
+		t.Errorf("styled main.go = %q", out)
+	}
+	out = Code([]byte("// \x1b]0;x\x07\nfunc main() {}\n"), "main.go", styled(80))
+	if want := "// ␛]0;x␇\nfunc main() {}\n"; stripEscapes(out) != want {
+		t.Errorf("styled main.go with control characters = %q, want %q without styles", out, want)
+	}
+}
+
+func TestCodeThemeIsResolvedOnlyWhenNeeded(t *testing.T) {
+	tests := []struct {
+		name   string
+		src    string
+		styled bool
+		calls  int
+	}{
+		{"styled", "func main() {}\n", true, 1},
+		{"plain mode", "func main() {}\n", false, 0},
+		{"empty file", "", true, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			opts := styled(80)
+			opts.Style.Styled = tt.styled
+			opts.Theme = func() highlight.Theme { calls++; return highlight.Dark }
+			Code([]byte(tt.src), "main.go", opts)
+			if calls != tt.calls {
+				t.Errorf("theme resolved %d times, want %d", calls, tt.calls)
+			}
+		})
+	}
+}
+
 func TestHyperlinks(t *testing.T) {
 	url := "https://example.com/very/long/path"
 	src := "[docs](" + url + ")\n"

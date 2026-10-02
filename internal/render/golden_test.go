@@ -48,3 +48,31 @@ func TestGolden(t *testing.T) {
 		}
 	}
 }
+
+// TestCodeFileGolden renders every testdata/codefiles fixture as a code file.
+// The plain output must be the fixture itself; the styled output is compared
+// with testdata/golden/<file>.styled.golden. The width does not matter, since
+// code is never wrapped.
+func TestCodeFileGolden(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join(fixtures, "codefiles", "*"))
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no code file fixtures found: %v", err)
+	}
+	for _, file := range files {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		name := filepath.Base(file)
+		t.Run(name, func(t *testing.T) {
+			if got := Code(src, name, goldenOptions(80, false)); got != string(src) {
+				t.Errorf("plain output differs from the file\n--- want\n%s\n--- got\n%s", src, got)
+			}
+			got := Code(src, name, goldenOptions(80, true))
+			if stripEscapes(got) != string(src) {
+				t.Errorf("styled output without escapes differs from the file\n%s", got)
+			}
+			golden.Assert(t, filepath.Join(fixtures, "golden", name+".styled.golden"), got)
+		})
+	}
+}

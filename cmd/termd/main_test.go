@@ -70,7 +70,12 @@ func (f *fake) run(args ...string) int {
 
 func writeFile(t *testing.T, content string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "doc.md")
+	return writeNamedFile(t, "doc.md", content)
+}
+
+func writeNamedFile(t *testing.T, name, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -625,5 +630,62 @@ func TestInvalidFrontmatterExitsZero(t *testing.T) {
 	out := f.stdout.String()
 	if !strings.Contains(out, "frontmatter - invalid YAML") || !strings.Contains(out, "After.") {
 		t.Errorf("output %q", out)
+	}
+}
+
+const (
+	goFile   = "package main\n\n// main does nothing.\nfunc main() {}\n"
+	yamlFile = "---\n# Server settings\nport: 8080\n"
+	twoLines = "first line\nsecond line\n"
+)
+
+func TestCodeFiles(t *testing.T) {
+	tests := []struct {
+		name, file, content, want string
+	}{
+		{"recognized extension", "main.go", goFile, goFile},
+		{"recognized whole name", "Makefile", "build:\n\tgo build ./...\n", "build:\n\tgo build ./...\n"},
+		{"comment lines are not headings", "config.yaml", yamlFile, yamlFile},
+		{"no line break at the end", "main.go", "func main() {}", "func main() {}\n"},
+		{"empty file", "empty.go", "", ""},
+		{"markdown file", "doc.md", twoLines, "first line second line\n"},
+		{"plain text file", "notes.txt", twoLines, "first line second line\n"},
+		{"unrecognized name", "README", twoLines, "first line second line\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fake{stdinTTY: true}
+			if code := f.run(writeNamedFile(t, tt.file, tt.content)); code != 0 || f.stdout.String() != tt.want {
+				t.Errorf("exit %d, stdout %q, want %q", code, f.stdout.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestStdinIsMarkdown(t *testing.T) {
+	for _, args := range [][]string{nil, {"-"}} {
+		f := &fake{stdin: "# Server settings\nport: 8080\n"}
+		want := "# Server settings\n\nport: 8080\n"
+		if code := f.run(args...); code != 0 || f.stdout.String() != want {
+			t.Errorf("%v: exit %d, stdout %q, want %q", args, code, f.stdout.String(), want)
+		}
+	}
+}
+
+func TestCodeFileInTerminal(t *testing.T) {
+	f := &fake{stdoutTTY: true, width: 80, height: 24, colorterm: "truecolor", lightOK: true}
+	f.run(writeNamedFile(t, "main.go", goFile))
+	if out := f.stdout.String(); !strings.Contains(out, "\x1b[38;2;") || stripSGR(out) != goFile {
+		t.Errorf("main.go in a terminal: %q", out)
+	}
+	if f.detectCalls != 1 {
+		t.Errorf("terminal queried %d times, want 1", f.detectCalls)
+	}
+
+	wide := strings.Repeat("x", 120)
+	f = &fake{stdoutTTY: true, width: 80, height: 24, hasLess: true}
+	f.run(writeNamedFile(t, "main.go", "package main\n\n// "+wide+"\n"))
+	if len(f.pagerCalls) != 1 || !strings.Contains(stripSGR(f.pagerCalls[0]), "// "+wide+"\n") {
+		t.Errorf("a code file with a wide line was not paged in full: %q", f.pagerCalls)
 	}
 }

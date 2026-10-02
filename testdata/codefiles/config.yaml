@@ -1,0 +1,10 @@
+---
+# Server settings
+server:
+  host: localhost
+  port: 8080
+
+# Enabled features
+features:
+  - tables
+  - diagrams

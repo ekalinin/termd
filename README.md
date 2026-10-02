@@ -43,6 +43,7 @@ cat README.md | termd       # render standard input
 termd - < README.md         # same, explicitly
 termd --width 60 doc.md     # lay out for 60 columns
 termd doc.md > doc.txt      # plain text, 80 columns
+termd main.go               # show a source file as code
 termd --version             # print the version
 ```
 
@@ -124,6 +125,12 @@ A fenced code block is highlighted when the first word of its info string names 
 
 With `--theme=auto`, termd asks the terminal for its background color (OSC 11) and waits at most 100 ms for the answer; a light background selects the light theme, anything else the dark one. The query is sent only when the document has a code block to highlight. Colors are 24-bit when `COLORTERM` is `truecolor` or `24bit`, and the nearest 256-color palette colors otherwise.
 
+### Code files
+
+When chroma recognizes the name of the input file as a language other than markdown or plain text, by its extension or by its whole name (`main.go`, `config.yaml`, `Makefile`, `Dockerfile`), termd shows the whole file as one code block instead of parsing it as markdown: every line as it is in the file, never wrapped, highlighted in a terminal, and scrolled horizontally in the pager when a line is wider than the screen. In a pipe, the output is the text of the file.
+
+Markdown files, plain text files such as `notes.txt`, files with a name chroma does not recognize (for example `README` without an extension) and standard input are rendered as markdown. The choice is made by the file name only, never by the content.
+
 ### Diagrams
 
 Fenced blocks with the info string `mermaid`, `plantuml` or `puml` are treated as diagrams. Supported mermaid diagrams are drawn with [mermaid-ascii](https://github.com/AlexanderGrooff/mermaid-ascii):
@@ -195,6 +202,7 @@ A golden file is a committed file that holds the expected output of a test. The 
 The golden files and the tests that use them:
 
 - `testdata/golden/<name>.w<width>.<mode>.golden` - every `testdata/<name>.md` rendered at widths 40, 60 and 80 in `plain` and `styled` modes (`TestGolden` in `internal/render`).
+- `testdata/golden/<file>.styled.golden` - every file in `testdata/codefiles/` rendered as a code file in `styled` mode; its `plain` output must be the file itself (`TestCodeFileGolden` in `internal/render`).
 - `internal/diagram/testdata/<name>.golden` - every diagram fixture in the same directory, rendered at width 200 (`TestGolden` in `internal/diagram`).
 - `internal/highlight/testdata/<lang>.<theme>.<depth>.golden` - code samples in `go`, `python` and `sh` with the `dark` and `light` themes in `truecolor` and `256` colors (`TestHighlightGolden` in `internal/highlight`).
 

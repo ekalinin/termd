@@ -95,3 +95,23 @@ func TestRecognized(t *testing.T) {
 		}
 	}
 }
+
+func TestRecognizedFile(t *testing.T) {
+	for _, name := range []string{"main.go", "dir/main.go", "config.yaml", "Makefile", "Dockerfile", "CMakeLists.txt"} {
+		if !RecognizedFile(name) {
+			t.Errorf("%q is not recognized", name)
+		}
+	}
+	for _, name := range []string{"README.md", "doc.markdown", "notes.txt", "README", "MAIN.GO", "flow.mmd", "diagram.puml", ""} {
+		if RecognizedFile(name) {
+			t.Errorf("%q is recognized", name)
+		}
+		if HighlightFile("x := 1", name, Dark) != nil {
+			t.Errorf("%q is highlighted", name)
+		}
+	}
+	got := render(HighlightFile(samples["go"], "main.go", Dark), style.TrueColor)
+	if want := render(Highlight(samples["go"], "go", Dark), style.TrueColor); got != want {
+		t.Errorf("main.go is highlighted differently from a go block\n got %q\nwant %q", got, want)
+	}
+}

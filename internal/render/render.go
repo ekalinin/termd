@@ -62,9 +62,34 @@ func Render(src []byte, opts Options) string {
 		blocks = append(blocks, b)
 	}
 	lines := join(append(blocks, r.blocks(Parse(body), opts.Width)...), true)
+	return output(lines, opts.Style)
+}
+
+// Code lays out the whole text of a source file as one code block and returns
+// the terminal output. The file name selects the highlighting language. The
+// text is never parsed as markdown and never drawn as a diagram.
+func Code(src []byte, name string, opts Options) string {
+	if len(src) == 0 {
+		return ""
+	}
+	code := strings.TrimSuffix(string(src), "\n")
+	r := &renderer{opts: opts}
+	var lines []text.Line
+	if opts.Style.Styled && highlight.RecognizedFile(name) {
+		lines = highlight.HighlightFile(code, name, r.resolveTheme())
+	}
+	if lines == nil {
+		lines = verbatim(code, opts.Width).Lines
+	}
+	return output(lines, opts.Style)
+}
+
+// output renders lines with their escape sequences, each followed by a line
+// break.
+func output(lines []text.Line, o style.Options) string {
 	var b strings.Builder
 	for _, l := range lines {
-		b.WriteString(l.Render(opts.Style))
+		b.WriteString(l.Render(o))
 		b.WriteByte('\n')
 	}
 	return b.String()

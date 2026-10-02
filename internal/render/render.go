@@ -241,16 +241,79 @@ func (r *renderer) list(n *ast.List, width int) Block {
 	return b
 }
 
-// quote prefixes every line of a block quote with a quote marker.
+// alertType is a GitHub alert: the marker that starts the quote, the title
+// shown in its place and the basic palette color of the title and the quote
+// marker.
+type alertType struct {
+	marker, title string
+	color         int
+}
+
+var alertTypes = []alertType{
+	{"[!NOTE]", "Note", 34},
+	{"[!TIP]", "Tip", 32},
+	{"[!IMPORTANT]", "Important", 35},
+	{"[!WARNING]", "Warning", 33},
+	{"[!CAUTION]", "Caution", 31},
+}
+
+// alert reports whether the block quote n is a GitHub alert: its first child
+// is a paragraph whose first line is an alert marker alone, in any case. It
+// returns the alert type and the spans of the rest of the paragraph.
+func (r *renderer) alert(n *ast.Blockquote) (alertType, []text.Span, bool) {
+	p, ok := n.FirstChild().(*ast.Paragraph)
+	if !ok {
+		return alertType{}, nil, false
+	}
+	// The marker is matched in the raw source, so an escaped \[!NOTE] stays
+	// a regular quote.
+	var line []byte
+	c := p.FirstChild()
+	for c != nil {
+		t, ok := c.(*ast.Text)
+		if !ok {
+			return alertType{}, nil, false
+		}
+		line = append(line, t.Segment.Value(r.src)...)
+		c = c.NextSibling()
+		if t.SoftLineBreak() || t.HardLineBreak() {
+			break
+		}
+	}
+	marker := strings.TrimSpace(string(line))
+	for _, a := range alertTypes {
+		if strings.EqualFold(marker, a.marker) {
+			var rest []text.Span
+			for ; c != nil; c = c.NextSibling() {
+				rest = append(rest, r.inline(c, style.Style{})...)
+			}
+			return a, rest, true
+		}
+	}
+	return alertType{}, nil, false
+}
+
+// quote prefixes every line of a block quote with a quote marker. In a GitHub
+// alert the title takes the place of the marker line, and the title and the
+// quote marker have the color of the alert.
 func (r *renderer) quote(n *ast.Blockquote, width int) Block {
 	children := r.blocks(n, width-2)
+	ms := markerStyle
+	if a, rest, ok := r.alert(n); ok {
+		ms = style.Style{ANSI: a.color}
+		spans := []text.Span{{Text: a.title, Style: style.Style{Bold: true, ANSI: a.color}}}
+		if len(rest) > 0 {
+			spans = append(append(spans, text.Break), rest...)
+		}
+		children[0] = Block{Lines: text.Wrap(spans, width-2, true)}
+	}
 	b := Block{Wide: anyWide(children)}
 	for _, l := range join(children, true) {
 		if len(l) == 0 {
-			b.Lines = append(b.Lines, text.Line{{Text: "│", Style: markerStyle}})
+			b.Lines = append(b.Lines, text.Line{{Text: "│", Style: ms}})
 			continue
 		}
-		b.Lines = append(b.Lines, l.Prepend(text.Span{Text: "│ ", Style: markerStyle}))
+		b.Lines = append(b.Lines, l.Prepend(text.Span{Text: "│ ", Style: ms}))
 	}
 	return b
 }

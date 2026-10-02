@@ -1,0 +1,44 @@
+# Alerts
+
+│ Note
+│ A note that is long enough to be
+│ wrapped, and every wrapped line has to
+│ keep the colored quote marker.
+
+│ Tip
+│ A tip.
+
+│ Important
+│ Something important.
+
+│ Warning
+│ A warning.
+
+│ Caution
+│ A caution.
+
+## Variants
+
+│ Note
+│ A lower-case marker.
+
+│ Tip
+
+│ Warning
+│ The first paragraph.
+│
+│ The second paragraph, followed by a
+│ nested quote:
+│
+│ │ A nested quote.
+
+• A list item with an alert:
+  │ Important
+  │ Inside a list item.
+
+## Regular quotes
+
+│ [!NOTE] Text after the marker on the
+│ same line.
+
+│ [!FOO] An unknown marker.

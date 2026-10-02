@@ -1,0 +1,41 @@
+[1m# Alerts[0m
+
+[34m│ [0m[1;34mNote[0m
+[34m│ [0mA note that is long enough to be wrapped, and every wrapped line has to keep
+[34m│ [0mthe colored quote marker.
+
+[32m│ [0m[1;32mTip[0m
+[32m│ [0mA tip.
+
+[35m│ [0m[1;35mImportant[0m
+[35m│ [0mSomething important.
+
+[33m│ [0m[1;33mWarning[0m
+[33m│ [0mA warning.
+
+[31m│ [0m[1;31mCaution[0m
+[31m│ [0mA caution.
+
+[1m## Variants[0m
+
+[34m│ [0m[1;34mNote[0m
+[34m│ [0mA lower-case marker.
+
+[32m│ [0m[1;32mTip[0m
+
+[33m│ [0m[1;33mWarning[0m
+[33m│ [0mThe first paragraph.
+[33m│[0m
+[33m│ [0mThe second paragraph, followed by a nested quote:
+[33m│[0m
+[33m│ [0m[2m│ [0mA nested quote.
+
+[2m• [0mA list item with an alert:
+  [35m│ [0m[1;35mImportant[0m
+  [35m│ [0mInside a list item.
+
+[1m## Regular quotes[0m
+
+[2m│ [0m[!NOTE] Text after the marker on the same line.
+
+[2m│ [0m[!FOO] An unknown marker.

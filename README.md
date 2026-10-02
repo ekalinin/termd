@@ -116,6 +116,8 @@ When stdout is a terminal and the output is taller than the screen, or has a lin
 
 With hyperlinks enabled, a link shows only its text and opens its destination when clicked (Cmd+click in iTerm2). With hyperlinks disabled, a link is written as `text (url)`, and images as `[image: alt] (url)`. URLs are never truncated.
 
+When the document is read from a file, relative destinations of links and images, such as `docs/guide.md` or `../img/arch.png`, are resolved against the directory of the file and become `file://` URLs with the host name of the machine, for example `file://myhost/home/me/project/docs/guide.md`, so a click opens the target with the default application of the system. The fragment of a destination (`guide.md#setup`) is kept, its query (`logo.png?raw=true`) is dropped. Absolute URLs, `#section` links and destinations that start with `/` are left as written; GitHub reads `/docs/x.md` as relative to the repository root, which termd does not know. A document read from stdin has no directory, so its links are left as written too. With hyperlinks disabled, `text (url)` always shows the destination as written in the document.
+
 ### Code highlighting
 
 A fenced code block is highlighted when the first word of its info string names a language known to [chroma](https://github.com/alecthomas/chroma) (names and common aliases such as `js`, `sh`, `yml`). Blocks without a language or with an unknown one are shown without colors; the text of a block is never changed.

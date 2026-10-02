@@ -1,6 +1,7 @@
 package render
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -303,6 +304,77 @@ func TestHyperlinks(t *testing.T) {
 	}
 	if got := renderLines("https://example.com\n", plain(80))[0]; got != "https://example.com" {
 		t.Errorf("autolink = %q", got)
+	}
+}
+
+func TestResolveLink(t *testing.T) {
+	const dir, host = "/home/u/proj", "box"
+	tests := []struct {
+		dest, want string
+	}{
+		{"docs/guide.md", "file://box/home/u/proj/docs/guide.md"},
+		{"./a.md", "file://box/home/u/proj/a.md"},
+		{"../other/b.md", "file://box/home/u/other/b.md"},
+		{"my notes.md", "file://box/home/u/proj/my%20notes.md"},
+		{"my%20notes.md", "file://box/home/u/proj/my%20notes.md"},
+		{"файл.md", "file://box/home/u/proj/%D1%84%D0%B0%D0%B9%D0%BB.md"},
+		{`my\_notes.md`, "file://box/home/u/proj/my_notes.md"},
+		{"guide.md#setup", "file://box/home/u/proj/guide.md#setup"},
+		{"logo.png?raw=true", "file://box/home/u/proj/logo.png"},
+		{"https://example.com", "https://example.com"},
+		{"mailto:me@example.com", "mailto:me@example.com"},
+		{"C:/x", "C:/x"},
+		{"#usage", "#usage"},
+		{"?tab=1", "?tab=1"},
+		{"/docs/x.md", "/docs/x.md"},
+		{"//example.com/x", "//example.com/x"},
+		{"", ""},
+		{"%zz", "%zz"},
+	}
+	for _, tt := range tests {
+		if got := resolveLink(tt.dest, dir, host); got != tt.want {
+			t.Errorf("resolveLink(%q) = %q, want %q", tt.dest, got, tt.want)
+		}
+	}
+	if got := resolveLink("docs/guide.md", "", host); got != "docs/guide.md" {
+		t.Errorf("without a directory: %q", got)
+	}
+	if got := resolveLink("docs/guide.md", dir, ""); got != "file:///home/u/proj/docs/guide.md" {
+		t.Errorf("without a host: %q", got)
+	}
+}
+
+func TestRelativeLinks(t *testing.T) {
+	host, _ := os.Hostname()
+	src := "[guide](docs/guide.md) ![arch](img/arch.png) [empty]()\n"
+	opts := Options{Width: 80, Style: style.Options{Hyperlinks: true}, Dir: "/home/u/proj"}
+	out := Render([]byte(src), opts)
+	for _, want := range []string{
+		"\x1b]8;;file://" + host + "/home/u/proj/docs/guide.md\x1b\\guide\x1b]8;;\x1b\\",
+		"\x1b]8;;file://" + host + "/home/u/proj/img/arch.png\x1b\\[image: arch]\x1b]8;;\x1b\\",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output %q lacks %q", out, want)
+		}
+	}
+	if strings.Count(out, "\x1b]8;;\x1b\\") != 2 || !strings.HasSuffix(out, " empty\n") {
+		t.Errorf("empty destination got a hyperlink: %q", out)
+	}
+
+	opts.Style.Hyperlinks = false
+	if got := renderLines(src, opts)[0]; got != "guide (docs/guide.md) [image: arch] (img/arch.png) empty" {
+		t.Errorf("plain output = %q", got)
+	}
+
+	opts.Style.Hyperlinks, opts.Dir = true, ""
+	if out := Render([]byte(src), opts); !strings.Contains(out, "\x1b]8;;docs/guide.md\x1b\\guide") {
+		t.Errorf("without a directory: %q", out)
+	}
+}
+
+func TestFileURL(t *testing.T) {
+	if got := fileURL("", "C:/proj/docs/guide.md", ""); got != "file:///C:/proj/docs/guide.md" {
+		t.Errorf("Windows path: %q", got)
 	}
 }
 

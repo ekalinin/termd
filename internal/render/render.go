@@ -27,6 +27,10 @@ type Options struct {
 	// Theme returns the highlighting theme. It is called at most once, and
 	// only when a code block is about to be highlighted.
 	Theme func() highlight.Theme
+	// Dir is the absolute directory of the document file. With hyperlinks,
+	// relative link destinations are resolved against it; empty keeps every
+	// destination as written.
+	Dir string
 }
 
 // Block is a rendered block: its lines and whether it is wider than the
@@ -394,7 +398,7 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 		ss.Strike = true
 		return r.inlines(n, ss)
 	case *ast.Link:
-		return text.LinkSpans(r.inlines(n, st), string(n.Destination), hyperlinks)
+		return text.LinkSpans(r.inlines(n, st), r.destination(n.Destination), hyperlinks)
 	case *ast.AutoLink:
 		label := string(n.Label(r.src))
 		url := string(n.URL(r.src))
@@ -408,7 +412,7 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 		return text.LinkSpans([]text.Span{{Text: label, Style: st}}, url, hyperlinks)
 	case *ast.Image:
 		label := []text.Span{{Text: "[image: " + r.plainText(n, false) + "]", Style: st}}
-		return text.LinkSpans(label, string(n.Destination), hyperlinks)
+		return text.LinkSpans(label, r.destination(n.Destination), hyperlinks)
 	case *ast.RawHTML:
 		var b strings.Builder
 		for i := range n.Segments.Len() {

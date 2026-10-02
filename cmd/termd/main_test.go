@@ -301,6 +301,56 @@ func TestDirectoryRendersAsFile(t *testing.T) {
 	}
 }
 
+func TestRelativeLinks(t *testing.T) {
+	const doc = "[guide](docs/guide.md)\n"
+	path := writeFile(t, doc)
+	dir := filepath.Dir(path)
+	host, _ := os.Hostname()
+	resolved := "\x1b]8;;file://" + host + filepath.ToSlash(dir) + "/docs/guide.md\x1b\\guide"
+	asWritten := "\x1b]8;;docs/guide.md\x1b\\guide"
+
+	t.Run("absolute path", func(t *testing.T) {
+		f := &fake{stdinTTY: true}
+		if f.run("--hyperlinks=always", path); !strings.Contains(f.stdout.String(), resolved) {
+			t.Errorf("stdout %q lacks %q", f.stdout.String(), resolved)
+		}
+	})
+	t.Run("relative path", func(t *testing.T) {
+		t.Chdir(filepath.Dir(dir))
+		f := &fake{stdinTTY: true}
+		if f.run("--hyperlinks=always", filepath.Join(filepath.Base(dir), "doc.md")); !strings.Contains(f.stdout.String(), resolved) {
+			t.Errorf("stdout %q lacks %q", f.stdout.String(), resolved)
+		}
+	})
+	t.Run("directory argument", func(t *testing.T) {
+		if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte(doc), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		f := &fake{stdinTTY: true}
+		if f.run("--hyperlinks=always", dir); !strings.Contains(f.stdout.String(), resolved) {
+			t.Errorf("stdout %q lacks %q", f.stdout.String(), resolved)
+		}
+	})
+	t.Run("piped stdin", func(t *testing.T) {
+		f := &fake{stdin: doc}
+		if f.run("--hyperlinks=always"); !strings.Contains(f.stdout.String(), asWritten) {
+			t.Errorf("stdout %q lacks %q", f.stdout.String(), asWritten)
+		}
+	})
+	t.Run("explicit stdin", func(t *testing.T) {
+		f := &fake{stdin: doc, stdinTTY: true}
+		if f.run("--hyperlinks=always", "-"); !strings.Contains(f.stdout.String(), asWritten) {
+			t.Errorf("stdout %q lacks %q", f.stdout.String(), asWritten)
+		}
+	})
+	t.Run("hyperlinks disabled", func(t *testing.T) {
+		f := &fake{stdinTTY: true}
+		if f.run("--hyperlinks=never", path); !strings.Contains(f.stdout.String(), "guide (docs/guide.md)") {
+			t.Errorf("stdout %q", f.stdout.String())
+		}
+	})
+}
+
 func TestVersion(t *testing.T) {
 	path := writeFile(t, "# From file\n")
 	for _, args := range [][]string{{"--version"}, {"--version", path}} {

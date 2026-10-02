@@ -174,6 +174,7 @@ func run(args []string, e env) int {
 			Depth:      colorDepth(e.getenv("COLORTERM")),
 		},
 		Theme: themeFunc(*theme, e.detectLight),
+		Dir:   docDir(file),
 	}
 	out := render.Render(src, opts)
 
@@ -226,6 +227,19 @@ func outputWidth(flagWidth int, flagSet bool, termWidth int, termOK bool) int {
 		return termWidth
 	}
 	return pipeWidth
+}
+
+// docDir returns the absolute directory of the document file, against which
+// relative links are resolved, or "" for stdin and when it cannot be found.
+func docDir(path string) string {
+	if path == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(abs)
 }
 
 // colorDepth selects 24-bit colors when COLORTERM advertises them.

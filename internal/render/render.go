@@ -17,6 +17,7 @@ import (
 	"github.com/ekalinin/termd/internal/style"
 	"github.com/ekalinin/termd/internal/table"
 	"github.com/ekalinin/termd/internal/text"
+	"github.com/ekalinin/termd/internal/theme"
 )
 
 // Options controls the layout and the escape sequences of the output.
@@ -27,6 +28,9 @@ type Options struct {
 	// Theme returns the highlighting theme. It is called at most once, and
 	// only when a code block is about to be highlighted.
 	Theme func() highlight.Theme
+	// Palette styles the elements of the document outside code blocks. The
+	// zero value means theme.Default.
+	Palette theme.Palette
 	// Dir is the absolute directory of the document file. With hyperlinks,
 	// relative link destinations are resolved against it; empty keeps every
 	// destination as written.
@@ -40,11 +44,6 @@ type Block struct {
 	Wide  bool
 }
 
-var (
-	codeStyle   = style.Style{ANSI: 36}
-	markerStyle = style.Style{Faint: true}
-)
-
 // Parse parses src as CommonMark with the GFM extensions and footnotes.
 func Parse(src []byte) ast.Node {
 	md := goldmark.New(goldmark.WithExtensions(extension.GFM, extension.Footnote))
@@ -56,9 +55,9 @@ func Parse(src []byte) ast.Node {
 // characters of the document are shown as visible characters.
 func Render(src []byte, opts Options) string {
 	fm, body := splitFrontmatter(cleanSource(src))
-	r := &renderer{src: body, opts: opts}
+	r := &renderer{src: body, opts: opts, pal: opts.palette()}
 	var blocks []Block
-	if b, ok := frontmatterBlock(fm, opts.Width); ok {
+	if b, ok := frontmatterBlock(fm, opts.Width, r.pal); ok {
 		blocks = append(blocks, b)
 	}
 	lines := join(append(blocks, r.blocks(Parse(body), opts.Width)...), true)
@@ -99,13 +98,23 @@ func output(lines []text.Line, o style.Options) string {
 type renderer struct {
 	src      []byte
 	opts     Options
+	pal      theme.Palette
 	theme    highlight.Theme
 	themeSet bool
+}
+
+// palette returns the palette of the options, theme.Default for a zero one.
+func (o Options) palette() theme.Palette {
+	if o.Palette == (theme.Palette{}) {
+		return theme.Default
+	}
+	return o.Palette
 }
 
 // resolveTheme asks for the theme once, when first needed.
 func (r *renderer) resolveTheme() highlight.Theme {
 	if !r.themeSet {
+		r.theme = highlight.Dark
 		if r.opts.Theme != nil {
 			r.theme = r.opts.Theme()
 		}
@@ -141,13 +150,13 @@ func (r *renderer) blocks(parent ast.Node, width int) []Block {
 func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 	switch n := n.(type) {
 	case *ast.Heading:
-		hs := style.Style{Bold: true}
+		hs := r.pal.Heading
 		spans := append([]text.Span{{Text: strings.Repeat("#", n.Level) + " ", Style: hs}}, r.inlines(n, hs)...)
 		return Block{Lines: text.Wrap(spans, width, true)}, true
 	case *ast.Paragraph, *ast.TextBlock:
 		return Block{Lines: text.Wrap(r.inlines(n, style.Style{}), width, true)}, true
 	case *ast.ThematicBreak:
-		return rule(width), true
+		return rule(width, r.pal.Marker), true
 	case *ast.FencedCodeBlock:
 		info := ""
 		if n.Info != nil {
@@ -178,9 +187,9 @@ func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 	return Block{}, false
 }
 
-// rule is the horizontal line of a thematic break.
-func rule(width int) Block {
-	return Block{Lines: []text.Line{{{Text: strings.Repeat("─", width), Style: markerStyle}}}}
+// rule is the horizontal line of a thematic break in the marker style ms.
+func rule(width int, ms style.Style) Block {
+	return Block{Lines: []text.Line{{{Text: strings.Repeat("─", width), Style: ms}}}}
 }
 
 func anyWide(blocks []Block) bool {
@@ -276,7 +285,7 @@ func (r *renderer) items(parent ast.Node, markers []string, tight bool, width in
 		for j, l := range lines {
 			switch {
 			case j == 0:
-				l = l.Prepend(text.Span{Text: marker, Style: markerStyle})
+				l = l.Prepend(text.Span{Text: marker, Style: r.pal.Marker})
 			case len(l) > 0:
 				l = l.Prepend(text.Span{Text: strings.Repeat(" ", indent)})
 			}
@@ -288,19 +297,19 @@ func (r *renderer) items(parent ast.Node, markers []string, tight bool, width in
 }
 
 // alertType is a GitHub alert: the marker that starts the quote, the title
-// shown in its place and the basic palette color of the title and the quote
+// shown in its place and the palette style of the title and the quote
 // marker.
 type alertType struct {
 	marker, title string
-	color         int
+	color         func(theme.Palette) style.Style
 }
 
 var alertTypes = []alertType{
-	{"[!NOTE]", "Note", 34},
-	{"[!TIP]", "Tip", 32},
-	{"[!IMPORTANT]", "Important", 35},
-	{"[!WARNING]", "Warning", 33},
-	{"[!CAUTION]", "Caution", 31},
+	{"[!NOTE]", "Note", func(p theme.Palette) style.Style { return p.Note }},
+	{"[!TIP]", "Tip", func(p theme.Palette) style.Style { return p.Tip }},
+	{"[!IMPORTANT]", "Important", func(p theme.Palette) style.Style { return p.Important }},
+	{"[!WARNING]", "Warning", func(p theme.Palette) style.Style { return p.Warning }},
+	{"[!CAUTION]", "Caution", func(p theme.Palette) style.Style { return p.Caution }},
 }
 
 // alert reports whether the block quote n is a GitHub alert: its first child
@@ -344,10 +353,10 @@ func (r *renderer) alert(n *ast.Blockquote) (alertType, []text.Span, bool) {
 // quote marker have the color of the alert.
 func (r *renderer) quote(n *ast.Blockquote, width int) Block {
 	children := r.blocks(n, width-2)
-	ms := markerStyle
+	ms := r.pal.Marker
 	if a, rest, ok := r.alert(n); ok {
-		ms = style.Style{ANSI: a.color}
-		spans := []text.Span{{Text: a.title, Style: style.Style{Bold: true, ANSI: a.color}}}
+		ms = a.color(r.pal)
+		spans := []text.Span{{Text: a.title, Style: style.Layer(ms, style.Style{Bold: true})}}
 		if len(rest) > 0 {
 			spans = append(append(spans, text.Break), rest...)
 		}
@@ -366,7 +375,7 @@ func (r *renderer) quote(n *ast.Blockquote, width int) Block {
 
 // table converts a GFM table node and lays it out.
 func (r *renderer) table(n *east.Table, width int) Block {
-	var t table.Table
+	t := table.Table{HeaderStyle: r.pal.TableHeader, BorderStyle: r.pal.TableBorder}
 	for _, a := range n.Alignments {
 		switch a {
 		case east.AlignLeft:
@@ -412,7 +421,7 @@ func (r *renderer) footnotes(n *east.FootnoteList, width int) Block {
 		tight = tight && blocks <= 1
 	}
 	list := r.items(n, markers, tight, width)
-	return Block{Lines: join([]Block{rule(width), list}, true), Wide: list.Wide}
+	return Block{Lines: join([]Block{rule(width, r.pal.Marker), list}, true), Wide: list.Wide}
 }
 
 // inlines renders the inline children of n on top of the base style st.
@@ -443,8 +452,7 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 	case *ast.String:
 		return []text.Span{{Text: string(n.Value), Style: st}}
 	case *ast.CodeSpan:
-		cs := st
-		cs.ANSI = codeStyle.ANSI
+		cs := style.Layer(st, r.pal.InlineCode)
 		return []text.Span{{Text: r.plainText(n, true), Style: cs}}
 	case *ast.Emphasis:
 		es := st
@@ -459,7 +467,7 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 		ss.Strike = true
 		return r.inlines(n, ss)
 	case *ast.Link:
-		return text.LinkSpans(r.inlines(n, st), r.destination(n.Destination), hyperlinks)
+		return text.LinkSpans(r.inlines(n, style.Layer(st, r.pal.Link)), r.destination(n.Destination), hyperlinks)
 	case *ast.AutoLink:
 		label := string(n.Label(r.src))
 		url := string(n.URL(r.src))
@@ -470,9 +478,9 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 				url = "mailto:" + url
 			}
 		}
-		return text.LinkSpans([]text.Span{{Text: label, Style: st}}, url, hyperlinks)
+		return text.LinkSpans([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, url, hyperlinks)
 	case *ast.Image:
-		label := []text.Span{{Text: "[image: " + r.plainText(n, false) + "]", Style: st}}
+		label := []text.Span{{Text: "[image: " + r.plainText(n, false) + "]", Style: style.Layer(st, r.pal.Link)}}
 		return text.LinkSpans(label, r.destination(n.Destination), hyperlinks)
 	case *ast.RawHTML:
 		var b strings.Builder

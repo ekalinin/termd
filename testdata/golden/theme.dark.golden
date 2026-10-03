@@ -1,0 +1,47 @@
+[1mtitle[0m │ Themes
+[1mtags[0m  │ termd, colors
+
+[1m# Heading with a [0m]8;;https://example.com\[1;4;34mlink[0m]8;;\[1m and [0m[1;36mcode[0m
+
+A paragraph with [3memphasis[0m, [1mstrong[0m, [9mstrike[0m, [36minline code[0m, a
+]8;;https://example.com\[4;34mlink[0m]8;;\ and a footnote[1].
+
+[2m• [0mfirst item
+[2m• [0m[ ] task item
+[2m• [0m[x] done item
+
+[2m1. [0mone
+[2m2. [0mtwo
+
+[2m│ [0mA regular quote.
+
+[34m│ [0m[1;34mNote[0m
+[34m│ [0mNote text.
+
+[32m│ [0m[1;32mTip[0m
+[32m│ [0mTip text.
+
+[35m│ [0m[1;35mImportant[0m
+[35m│ [0mImportant text.
+
+[33m│ [0m[1;33mWarning[0m
+[33m│ [0mWarning text.
+
+[31m│ [0m[1;31mCaution[0m
+[31m│ [0mCaution text.
+
+[1mName[0m │ [1;36mcode[0m
+─────┼─────
+a    │ [36mb[0m
+]8;;https://example.com\[4;34mlink[0m]8;;\ │ d
+
+[3;38;2;139;148;158m// main prints a greeting.[0m
+[38;2;255;123;114mfunc[0m[38;2;110;118;129m [0m[1;38;2;210;168;255mmain[0m()[38;2;110;118;129m [0m{
+[38;2;110;118;129m	[0mfmt.[1;38;2;210;168;255mPrintln[0m([38;2;165;214;255m"hello"[0m,[38;2;110;118;129m [0m[38;2;165;214;255m42[0m)
+}
+
+[2m────────────────────────────────────────────────────────────[0m
+
+[2m────────────────────────────────────────────────────────────[0m
+
+[2m1. [0mThe footnote.

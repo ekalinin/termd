@@ -7,9 +7,9 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/ekalinin/termd/internal/diagram"
-	"github.com/ekalinin/termd/internal/style"
 	"github.com/ekalinin/termd/internal/table"
 	"github.com/ekalinin/termd/internal/text"
+	"github.com/ekalinin/termd/internal/theme"
 )
 
 // fmKind tells how the leading frontmatter block of a document is shown.
@@ -101,13 +101,11 @@ func parseFrontmatter(src string) (fm frontmatter) {
 	return frontmatter{kind: fmTable, src: src, root: root}
 }
 
-// keyStyle marks the keys of the frontmatter table.
-var keyStyle = style.Style{Bold: true}
-
 // frontmatterBlock renders the frontmatter as the first block of the
 // document: a key-value table for a mapping, the source in a frame for
-// invalid YAML. ok is false when there is nothing to show.
-func frontmatterBlock(fm frontmatter, width int) (b Block, ok bool) {
+// invalid YAML. The palette styles the keys and the column separator. ok
+// is false when there is nothing to show.
+func frontmatterBlock(fm frontmatter, width int, pal theme.Palette) (b Block, ok bool) {
 	switch fm.kind {
 	case fmTable:
 	case fmInvalid:
@@ -120,10 +118,10 @@ func frontmatterBlock(fm frontmatter, width int) (b Block, ok bool) {
 		return Block{}, false
 	}
 	cleanValues(fm.root)
-	var t table.Table
+	t := table.Table{BorderStyle: pal.TableBorder}
 	pairs := fm.root.Content
 	for i := 0; i+1 < len(pairs); i += 2 {
-		key := table.Cell{{Text: scalarOrFlow(pairs[i]), Style: keyStyle}}
+		key := table.Cell{{Text: scalarOrFlow(pairs[i]), Style: pal.FrontmatterKey}}
 		t.Rows = append(t.Rows, []table.Cell{key, valueSpans(pairs[i+1])})
 	}
 	lines, wide := t.Render(width)

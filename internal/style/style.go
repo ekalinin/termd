@@ -34,6 +34,21 @@ func (s Style) IsZero() bool {
 	return s == Style{}
 }
 
+// Layer returns top applied over base: the attributes of both are combined,
+// and the color of top, when it has one, replaces the color of base.
+func Layer(base, top Style) Style {
+	s := base
+	s.Bold = s.Bold || top.Bold
+	s.Italic = s.Italic || top.Italic
+	s.Underline = s.Underline || top.Underline
+	s.Strike = s.Strike || top.Strike
+	s.Faint = s.Faint || top.Faint
+	if top.ANSI != 0 || top.FG.Set {
+		s.ANSI, s.FG = top.ANSI, top.FG
+	}
+	return s
+}
+
 // Depth is the color depth used for 24-bit colors.
 type Depth int
 

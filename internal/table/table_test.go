@@ -6,6 +6,7 @@ import (
 
 	"github.com/rivo/uniseg"
 
+	"github.com/ekalinin/termd/internal/style"
 	"github.com/ekalinin/termd/internal/text"
 )
 
@@ -250,4 +251,49 @@ func TestRaggedRows(t *testing.T) {
 		t.Errorf("short row %q has %d separators, want 2", got[2], n)
 	}
 	assertAligned(t, got[:2])
+}
+
+func TestStyles(t *testing.T) {
+	border := style.Style{FG: style.RGB(1, 2, 3)}
+	header := style.Style{Bold: true, FG: style.RGB(4, 5, 6)}
+	tb := Table{
+		Header:      []Cell{{{Text: "Name"}}, {{Text: "code", Style: style.Style{ANSI: 36}}}},
+		Rows:        [][]Cell{cells("a", "b"), cells("c", "d")},
+		HeaderStyle: header,
+		BorderStyle: border,
+	}
+	lines, _ := tb.Render(80)
+	if len(lines) != 4 {
+		t.Fatalf("got %d lines, want 4: %q", len(lines), lineStrings(lines))
+	}
+	for _, l := range append([]text.Line{lines[0]}, lines[2:]...) {
+		for _, sp := range l {
+			if strings.Contains(sp.Text, "│") && sp.Style != border {
+				t.Errorf("separator in %q has style %+v, want %+v", l.String(), sp.Style, border)
+			}
+		}
+	}
+	for _, sp := range lines[1] {
+		if sp.Style != border {
+			t.Errorf("header line span %q has style %+v, want %+v", sp.Text, sp.Style, border)
+		}
+	}
+	want := map[string]style.Style{"Name": header, "code": {Bold: true, ANSI: 36}}
+	for _, sp := range lines[0] {
+		if w, ok := want[sp.Text]; ok && sp.Style != w {
+			t.Errorf("header cell %q has style %+v, want %+v", sp.Text, sp.Style, w)
+		}
+	}
+}
+
+func TestZeroStyles(t *testing.T) {
+	tb := Table{Header: cells("a", "b"), Rows: [][]Cell{cells("c", "d")}}
+	lines, _ := tb.Render(80)
+	for _, l := range lines {
+		for _, sp := range l {
+			if !sp.Style.IsZero() {
+				t.Errorf("span %q in %q has style %+v", sp.Text, l.String(), sp.Style)
+			}
+		}
+	}
 }

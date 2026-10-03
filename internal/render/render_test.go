@@ -2,6 +2,7 @@ package render
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/ekalinin/termd/internal/highlight"
 	"github.com/ekalinin/termd/internal/style"
 	"github.com/ekalinin/termd/internal/text"
+	"github.com/ekalinin/termd/internal/theme"
 )
 
 func plain(width int) Options {
@@ -535,7 +537,7 @@ func TestInvalidFrontmatter(t *testing.T) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 	fm, _ := splitFrontmatter([]byte("---\ntitle: [unclosed\n---\n"))
-	if b, _ := frontmatterBlock(fm, 20); !b.Wide {
+	if b, _ := frontmatterBlock(fm, 20, theme.Default); !b.Wide {
 		t.Error("frame wider than the output is not marked wide")
 	}
 }
@@ -777,4 +779,131 @@ func TestFootnotesWithFrontmatter(t *testing.T) {
 	if got[0] != "title │ Doc" || !slices.Contains(got, "Text[1].") || got[len(got)-1] != "1. Note." {
 		t.Errorf("got %q", got)
 	}
+}
+
+// themed returns styled options without hyperlinks, with the palette and the
+// highlighting theme of a built-in theme.
+func themed(t *testing.T, name string) Options {
+	t.Helper()
+	th, ok := theme.Get(name)
+	if !ok {
+		t.Fatalf("no theme %q", name)
+	}
+	o := styled(80)
+	o.Style.Hyperlinks = false
+	o.Palette = th.Palette
+	o.Theme = func() highlight.Theme { return th.Code }
+	return o
+}
+
+func sgr(codes string) string {
+	return "\x1b[" + codes + "m"
+}
+
+// findLine returns the first line whose text without escapes is want.
+func findLine(t *testing.T, lines []string, want string) string {
+	t.Helper()
+	for _, l := range lines {
+		if stripEscapes(l) == want {
+			return l
+		}
+	}
+	t.Fatalf("no line %q in %q", want, lines)
+	return ""
+}
+
+func TestPalette(t *testing.T) {
+	t.Run("zero palette is the default", func(t *testing.T) {
+		files, err := filepath.Glob(filepath.Join(fixtures, "*.md"))
+		if err != nil || len(files) == 0 {
+			t.Fatalf("no fixtures found: %v", err)
+		}
+		def := styled(80)
+		def.Palette = theme.Default
+		for _, file := range files {
+			src, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if Render(src, styled(80)) != Render(src, def) {
+				t.Errorf("%s: zero palette and default palette differ", file)
+			}
+		}
+	})
+	t.Run("link inside a heading", func(t *testing.T) {
+		out := Render([]byte("# See [docs](https://example.com)\n"), themed(t, "dracula"))
+		if !strings.Contains(out, sgr("1;38;2;189;147;249")+"# See ") {
+			t.Errorf("heading text is not bold #bd93f9: %q", out)
+		}
+		if !strings.Contains(out, sgr("1;4;38;2;139;233;253")+"docs") {
+			t.Errorf("link is not bold, underlined and #8be9fd: %q", out)
+		}
+	})
+	t.Run("inline code inside a link", func(t *testing.T) {
+		out := Render([]byte("[`run`](https://example.com)\n"), themed(t, "dark"))
+		if !strings.Contains(out, sgr("4;36")+"run") {
+			t.Errorf("inline code in a link is not underlined cyan: %q", out)
+		}
+	})
+	t.Run("heading in truecolor and 256 colors", func(t *testing.T) {
+		o := themed(t, "dracula")
+		if got, want := renderLines("# Title\n", o)[0], sgr("1;38;2;189;147;249")+"# Title"+style.Reset; got != want {
+			t.Errorf("truecolor heading = %q, want %q", got, want)
+		}
+		o.Style.Depth = style.Color256
+		if got, want := renderLines("# Title\n", o)[0], sgr("1;38;5;141")+"# Title"+style.Reset; got != want {
+			t.Errorf("256-color heading = %q, want %q", got, want)
+		}
+	})
+	t.Run("same style for every heading level", func(t *testing.T) {
+		lines := renderLines("# Title\n\n### Section\n", themed(t, "nord"))
+		if got, want := lines[2], strings.Replace(lines[0], "# Title", "### Section", 1); got != want {
+			t.Errorf("### Section = %q, want the style of # Title: %q", got, want)
+		}
+	})
+	t.Run("marker is not faint", func(t *testing.T) {
+		if got, want := renderLines("- item\n", themed(t, "catppuccin-mocha"))[0], sgr("38;2;108;112;134")+"• "+style.Reset+"item"; got != want {
+			t.Errorf("list item = %q, want %q", got, want)
+		}
+	})
+	t.Run("alert in a named theme", func(t *testing.T) {
+		lines := renderLines("> [!WARNING]\n> Careful.\n", themed(t, "nord"))
+		marker := sgr("38;2;235;203;139") + "│ " + style.Reset
+		want := []string{marker + sgr("1;38;2;235;203;139") + "Warning" + style.Reset, marker + "Careful."}
+		if !slices.Equal(lines, want) {
+			t.Errorf("alert = %q, want %q", lines, want)
+		}
+	})
+	t.Run("table borders", func(t *testing.T) {
+		lines := renderLines("| A | `b` |\n|---|---|\n| c | d |\n", themed(t, "nord"))
+		sep := sgr("38;2;97;110;135") + " │ " + style.Reset
+		want := []string{
+			sgr("1;38;2;136;192;208") + "A" + style.Reset + sep + sgr("1;38;2;143;188;187") + "b" + style.Reset,
+			sgr("38;2;97;110;135") + "──┼──" + style.Reset,
+			"c" + sep + "d",
+		}
+		if !slices.Equal(lines, want) {
+			t.Errorf("table = %q, want %q", lines, want)
+		}
+	})
+	t.Run("unthemed elements", func(t *testing.T) {
+		lines := renderLines("Text *italic* ref[^1].\n\n- [ ] todo\n\n[^1]: Note.\n", themed(t, "gruvbox"))
+		if got, want := findLine(t, lines, "Text italic ref[1]."), "Text "+sgr("3")+"italic"+style.Reset+" ref[1]."; got != want {
+			t.Errorf("paragraph = %q, want %q", got, want)
+		}
+		if got, want := findLine(t, lines, "• [ ] todo"), sgr("38;2;146;131;116")+"• "+style.Reset+"[ ] todo"; got != want {
+			t.Errorf("task item = %q, want %q", got, want)
+		}
+	})
+	t.Run("plain mode ignores the palette", func(t *testing.T) {
+		src, err := os.ReadFile(filepath.Join(fixtures, "regression.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		o := plain(80)
+		o.Palette = themed(t, "dracula").Palette
+		if Render(src, o) != Render(src, plain(80)) {
+			t.Error("plain output depends on the palette")
+		}
+	})
 }

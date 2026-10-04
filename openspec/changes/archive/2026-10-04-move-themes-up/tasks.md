@@ -14,5 +14,5 @@
 ## 3. Checks
 
 - [x] 3.1 Run `make check`; verify it passes
-- [ ] 3.2 After the branch is pushed, open `README.md` of the branch on GitHub; verify "Color themes" with twelve screenshots follows "Features", the `Themes` link in the `--theme` row and the `theme` link above the screenshots open "How it works > Themes", and the `Color themes` link in "Theme screenshots" opens the new section
-- [ ] 3.3 After the `Pages` run for the merge commit passes, open `https://ekalinin.github.io/termd/`; verify the showcase is the first section under the sticky bar and the page theme switcher is labelled `Page theme`
+- [x] 3.2 After the branch is pushed, open `README.md` of the branch on GitHub; verify "Color themes" with twelve screenshots follows "Features", the `Themes` link in the `--theme` row and the `theme` link above the screenshots open "How it works > Themes", and the `Color themes` link in "Theme screenshots" opens the new section
+- [x] 3.3 After the `Pages` run for the merge commit passes, open `https://ekalinin.github.io/termd/`; verify the showcase is the first section under the sticky bar and the page theme switcher is labelled `Page theme`

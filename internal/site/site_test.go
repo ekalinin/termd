@@ -248,8 +248,13 @@ func TestShowcaseMatchesRenderer(t *testing.T) {
 func TestShowcasePage(t *testing.T) {
 	p := page(t)
 	section := strings.Index(p, `<section class="showcase"`)
-	if section < 0 || section < strings.LastIndex(p, `<section class="example"`) {
-		t.Fatal("no showcase section after the examples")
+	if section < 0 || section > strings.Index(p, `<section class="example"`) {
+		t.Fatal("no showcase section before the examples")
+	}
+	for _, label := range []string{"Page theme", "termd theme"} {
+		if n := strings.Count(p, `role="radiogroup" aria-label="`+label+`"`); n != 1 {
+			t.Errorf("%d switchers labelled %q, want 1", n, label)
+		}
 	}
 	last := section
 	for _, name := range theme.Names() {

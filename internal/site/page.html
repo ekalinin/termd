@@ -27,8 +27,8 @@
 {{range .Widths}}<input type="radio" name="width" id="width-{{.}}"{{if eq . $.DefaultWidth}} checked{{end}}><label for="width-{{.}}">{{.}}</label>
 {{end}}</div>
 </div>
-<div class="group" role="radiogroup" aria-label="Theme">
-<span class="label">Theme</span>
+<div class="group" role="radiogroup" aria-label="Page theme">
+<span class="label">Page theme</span>
 <div class="seg">
 <input type="radio" name="theme" id="theme-auto" checked><label for="theme-auto">auto</label>
 <input type="radio" name="theme" id="theme-light"><label for="theme-light">light</label>
@@ -37,18 +37,7 @@
 </div>
 </nav>
 <main>
-{{range .Examples}}{{$file := .File}}<section class="example" id="{{.Name}}">
-{{range .Widths}}{{$cols := .Cols}}<div class="cols-{{$cols}}">
-{{range .Fragments}}<figure class="window{{with .Theme}} {{.}}{{end}}">
-<figcaption class="titlebar"><span class="prompt" aria-hidden="true">$</span> termd --width {{$cols}}{{with .Theme}} --theme {{.}}{{end}} {{$file}}</figcaption>
-<div class="screen">
-<div class="ruler" aria-hidden="true">{{ruler $cols}}</div>
-<pre class="term">{{.HTML}}</pre>
-</div>
-</figure>
-{{end}}</div>
-{{end}}</section>
-{{end}}<section class="showcase" id="themes">
+<section class="showcase" id="themes">
 <div class="group" role="radiogroup" aria-label="termd theme">
 <span class="label">termd theme</span>
 <div class="seg">
@@ -65,7 +54,18 @@
 </figure>
 {{end}}</div>
 {{end}}</section>
-</main>
+{{range .Examples}}{{$file := .File}}<section class="example" id="{{.Name}}">
+{{range .Widths}}{{$cols := .Cols}}<div class="cols-{{$cols}}">
+{{range .Fragments}}<figure class="window{{with .Theme}} {{.}}{{end}}">
+<figcaption class="titlebar"><span class="prompt" aria-hidden="true">$</span> termd --width {{$cols}}{{with .Theme}} --theme {{.}}{{end}} {{$file}}</figcaption>
+<div class="screen">
+<div class="ruler" aria-hidden="true">{{ruler $cols}}</div>
+<pre class="term">{{.HTML}}</pre>
+</div>
+</figure>
+{{end}}</div>
+{{end}}</section>
+{{end}}</main>
 <footer>
 <a href="{{.Repo}}">GitHub</a>
 <a href="{{.License}}">MIT License</a>

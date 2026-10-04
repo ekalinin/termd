@@ -1,0 +1,68 @@
+[1m# Definition lists[0m
+
+A definition list is a paragraph
+followed by lines that start with a
+colon and a space.
+
+[1m## One entry[0m
+
+[1mtermd[0m
+    A terminal markdown viewer.
+
+[1m## Two terms, two definitions[0m
+
+[1mColour[0m
+[1mColor[0m
+    The visual property of an object.
+    A palette entry of a theme.
+
+[1m## Several entries[0m
+
+[1;36m--width[0m
+    Output width in columns, with
+    [3memphasis[0m and a ]8;;https://example.com/docs\[4;34mlink[0m]8;;\.
+[1;36m--theme[0m
+    Color theme.
+
+[1m## Loose list[0m
+
+[1mTight[0m
+    No blank line before this
+    definition.
+
+[1mLoose[0m
+    A blank line before this definition
+    makes the whole list loose.
+
+[1m## Several blocks[0m
+
+[1mInstall[0m
+    Build the binary from source.
+
+    The second paragraph and a code
+    block belong to the same definition:
+
+    make build
+
+[1m## Long definition[0m
+
+[1mWrapping[0m
+    This definition is long enough to
+    wrap at every width of the golden
+    files, and its wrapped lines start
+    four columns to the right of the
+    term.
+
+[1m## In containers[0m
+
+[2m• [0mA list item with a definition list:
+  [1mTerm[0m
+      Definition inside a list item.
+
+[2m│ [0m[1mTerm[0m
+[2m│ [0m    Definition inside a block quote.
+
+[1m## Not a definition[0m
+
+Term :not a definition, because the
+colon has no space after it.

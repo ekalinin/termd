@@ -40,7 +40,7 @@ func renderLines(src string, opts Options) []string {
 }
 
 func TestParseGFM(t *testing.T) {
-	src := "| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~text~~ https://example.com\n\nText[^1].\n\n[^1]: Note.\n"
+	src := "| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~text~~ https://example.com\n\nText[^1].\n\n[^1]: Note.\n\nTerm\n: Definition.\n"
 	found := map[string]bool{}
 	_ = ast.Walk(Parse([]byte(src)), func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
@@ -57,11 +57,17 @@ func TestParseGFM(t *testing.T) {
 				found["footnote reference"] = true
 			case *east.FootnoteList:
 				found["footnote list"] = true
+			case *east.DefinitionList:
+				found["definition list"] = true
+			case *east.DefinitionTerm:
+				found["definition term"] = true
+			case *east.DefinitionDescription:
+				found["definition description"] = true
 			}
 		}
 		return ast.WalkContinue, nil
 	})
-	for _, k := range []string{"table", "task", "strikethrough", "autolink", "footnote reference", "footnote list"} {
+	for _, k := range []string{"table", "task", "strikethrough", "autolink", "footnote reference", "footnote list", "definition list", "definition term", "definition description"} {
 		if !found[k] {
 			t.Errorf("no %s node in the AST", k)
 		}
@@ -779,6 +785,93 @@ func TestFootnotesWithFrontmatter(t *testing.T) {
 	if got[0] != "title │ Doc" || !slices.Contains(got, "Text[1].") || got[len(got)-1] != "1. Note." {
 		t.Errorf("got %q", got)
 	}
+}
+
+func TestDefinitionLists(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"term and definition", "Term\n: Definition of the term\n", []string{"Term", "    Definition of the term"}},
+		{
+			"several terms and definitions",
+			"Apple\nPomme\n: A fruit\n: Red or green\n",
+			[]string{"Apple", "Pomme", "    A fruit", "    Red or green"},
+		},
+		{
+			"several entries",
+			"Term A\n: Def A\n\nTerm B\n: Def B\n",
+			[]string{"Term A", "    Def A", "Term B", "    Def B"},
+		},
+		{
+			"loose list",
+			"Term A\n\n: Def A\n\nTerm B\n: Def B\n",
+			[]string{"Term A", "    Def A", "", "Term B", "    Def B"},
+		},
+		{
+			"several blocks",
+			"Term\n: First paragraph.\n\n    Second paragraph.\n",
+			[]string{"Term", "    First paragraph.", "", "    Second paragraph."},
+		},
+		{
+			"inline content",
+			"`--width`\n: See [docs](https://example.com).\n",
+			[]string{"--width", "    See docs (https://example.com)."},
+		},
+		{
+			"paragraph lines become terms",
+			"First line\nsecond line\n: Definition\n",
+			[]string{"First line", "second line", "    Definition"},
+		},
+		{"colon without a space", "Term\n:not a definition\n", []string{"Term :not a definition"}},
+		// goldmark makes the list tight: the definition list replaces the
+		// paragraph that had the blank line before it.
+		{"in a list item", "- item\n\n  Term\n  : Def\n", []string{"• item", "  Term", "      Def"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := renderLines(tt.src, plain(40))
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
+			}
+		})
+	}
+	t.Run("long definition", func(t *testing.T) {
+		got := renderLines("Term\n: "+strings.Repeat("word ", 20)+"\n", plain(40))
+		if len(got) < 3 || got[0] != "Term" {
+			t.Fatalf("definition did not wrap: %q", got)
+		}
+		for _, l := range got[1:] {
+			if !strings.HasPrefix(l, "    word") || text.Width(l) > 40 {
+				t.Errorf("definition line %q", l)
+			}
+		}
+	})
+}
+
+func TestDefinitionListStyles(t *testing.T) {
+	src := "Term\n: Definition of the term\n"
+	t.Run("bold term", func(t *testing.T) {
+		lines := renderLines(src, styled(80))
+		if got, want := lines[0], sgr("1")+"Term"+style.Reset; got != want {
+			t.Errorf("term = %q, want %q", got, want)
+		}
+		if got, want := lines[1], "    Definition of the term"; got != want {
+			t.Errorf("definition = %q, want %q", got, want)
+		}
+	})
+	t.Run("named theme", func(t *testing.T) {
+		if got, want := renderLines(src, themed(t, "dracula"))[0], sgr("1")+"Term"+style.Reset; got != want {
+			t.Errorf("term = %q, want %q", got, want)
+		}
+	})
+	t.Run("inline code in a term", func(t *testing.T) {
+		out := Render([]byte("`code` term\n: Def\n"), themed(t, "dracula"))
+		if !strings.Contains(out, sgr("1;38;2;80;250;123")+"code") {
+			t.Errorf("inline code in a term is not bold in the inline code color: %q", out)
+		}
+	})
 }
 
 // themed returns styled options without hyperlinks, with the palette and the

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>termd --theme {{.Theme}}</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="shot">
+<div class="showcase" style="--cols:{{.Cols}}">
+<figure class="window theme-{{.Theme}}" style="{{.Style}}">
+<figcaption class="titlebar"><span class="prompt" aria-hidden="true">$</span> termd --width {{.Cols}} --theme {{.Theme}} themes.md</figcaption>
+<div class="screen">
+<pre class="term">{{.HTML}}</pre>
+</div>
+</figure>
+</div>
+</body>
+</html>

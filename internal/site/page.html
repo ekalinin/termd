@@ -6,6 +6,9 @@
 <title>termd</title>
 <meta name="description" content="{{.Description}}">
 <link rel="stylesheet" href="style.css">
+<style>
+{{range .Themes}}:root:has(#termd-theme-{{.}}:checked) .showcase .theme-{{.}} { display: block; }
+{{end}}</style>
 </head>
 <body>
 <header class="hero">
@@ -45,7 +48,24 @@
 </figure>
 {{end}}</div>
 {{end}}</section>
-{{end}}</main>
+{{end}}<section class="showcase" id="themes">
+<div class="group" role="radiogroup" aria-label="termd theme">
+<span class="label">termd theme</span>
+<div class="seg">
+{{range .Themes}}<input type="radio" name="termd-theme" id="termd-theme-{{.}}"{{if eq . $.DefaultTheme}} checked{{end}}><label for="termd-theme-{{.}}">{{.}}</label>
+{{end}}</div>
+</div>
+{{range .Showcase}}{{$cols := .Cols}}<div class="cols-{{$cols}}">
+{{range .Windows}}<figure class="window theme-{{.Theme}}" style="{{.Style}}">
+<figcaption class="titlebar"><span class="prompt" aria-hidden="true">$</span> termd --width {{$cols}} --theme {{.Theme}} themes.md</figcaption>
+<div class="screen">
+<div class="ruler" aria-hidden="true">{{ruler $cols}}</div>
+<pre class="term">{{.HTML}}</pre>
+</div>
+</figure>
+{{end}}</div>
+{{end}}</section>
+</main>
 <footer>
 <a href="{{.Repo}}">GitHub</a>
 <a href="{{.License}}">MIT License</a>

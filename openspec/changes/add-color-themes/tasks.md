@@ -41,3 +41,23 @@
 
 - [x] 9.1 Run `make check` and `openspec validate add-color-themes --strict`; verify both pass and `git status testdata/golden internal/highlight/testdata internal/diagram/testdata internal/site/testdata` shows no modified files, only the new theme golden files
 - [x] 9.2 Run `make build` and, in a pseudo-terminal (`script -q /dev/null ...`), `./termd --no-pager --theme=<name> testdata/themes/sample.md` for every theme with `COLORTERM=truecolor` and without `COLORTERM`; verify each theme shows its colors, no marker is faint in a named theme, and `--theme=dark` and `--theme=light` differ only in the code block; then verify `TERMD_THEME=nord ./termd README.md > out.txt` gives plain text with exit status 0, `TERMD_THEME=drakula ./termd README.md` exits with status 2 naming `TERMD_THEME`, `./termd --help` lists the themes, and `make site` succeeds
+
+## 10. Window colors of a theme
+
+- [x] 10.1 Add `TestColors` to `internal/highlight/highlight_test.go`: `Dark.Colors()` is `#e6edf3` on `#0d1117`, `Theme("dracula").Colors()` is `#f8f8f2` on `#282a36`, `Theme("nord").Colors()` is `#d8dee9` on `#2e3440`; add to `internal/theme/theme_test.go` that every theme's `Code.Colors()` has a set background color and, except for `light` (`github` defines none), a set text color (the check lives there because `internal/theme` imports `internal/highlight`); verify `go test ./internal/highlight` fails
+- [x] 10.2 Add `Theme.Colors()` to `internal/highlight/highlight.go`, returning the text and background colors of the `Text` entry of the chroma style; verify `go test ./internal/highlight ./internal/theme` passes
+
+## 11. Theme showcase on the page
+
+- [x] 11.1 Add the showcase document `internal/site/themes.md` (a heading, a paragraph with a link and inline code, a list, a note and a warning alert, a table, a `go` block) and tests to `internal/site/site_test.go`, one per scenario of the "Theme showcase" requirement that the HTML can show: `Showcase()` has one fragment per width and theme, in the order of `theme.Names()`, whose text equals termd's styled output for `themes.md` with that theme without escape sequences; the page has a `<section class="showcase">` after the last example, a radio group with one `termd-theme-<name>` input per theme in that order with `dark` checked, a generated rule per theme, a window per width and theme titled `termd --width <N> --theme <name> themes.md` with the inline colors of the theme (`#282a36` for dracula) and `color-scheme: light` only for `light`, `solarized-light`, `gruvbox-light` and `catppuccin-latte`; the five examples and their fragments do not change; verify `go test ./internal/site` fails
+- [x] 11.2 Implement `Showcase()` in `internal/site/site.go`, the section, the switcher and the generated rules in `internal/site/page.html`, and the showcase styles in `internal/site/style.css` (screen, title bar, border and ruler from the window variables, wrapping switcher); verify `go test ./internal/site` passes, `git status internal/site/testdata` shows no changes, and `make site` builds a page that shows the switcher and the windows in Chrome, with `dracula` on `#282a36` after selecting it, at each width, with the light and dark page themes
+
+## 12. Screenshots
+
+- [x] 12.1 Add a test for `site.BuildShots(dir)`: it writes `style.css` and one `<name>.html` per theme, each with exactly one window of that theme at 60 columns, titled `termd --width 60 --theme <name> themes.md`, without a ruler, whose text equals termd's output; verify `go test ./internal/site` fails
+- [x] 12.2 Implement `BuildShots` and the screenshot page template in `internal/site`, the `-shots` flag in `cmd/termd-site/main.go`, and the `screenshots` target with a `CHROME` variable in `Makefile`; run `make screenshots`; verify `docs/themes/` holds twelve PNG files, each trimmed to the window of its theme, and `go test ./internal/site` passes
+- [x] 12.3 Add `TestThemeScreenshots` to `internal/site/site_test.go`: every theme has `docs/themes/<name>.png` and the README references it; add the screenshot table at the end of "Examples" in `README.md`, `make screenshots` to the Development section and `docs/themes/` to the layout table; verify `go test ./internal/site` passes and fails when a PNG is renamed
+
+## 13. Verification of the site and the screenshots
+
+- [x] 13.1 Run `make check` and `openspec validate add-color-themes --strict`; verify both pass, the existing golden files are unchanged, and `make site` succeeds with `PATH` lacking Chrome and ImageMagick

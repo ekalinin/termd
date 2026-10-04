@@ -3,10 +3,12 @@ PKG         := ./cmd/termd
 GOLDEN_PKGS := ./internal/render ./internal/diagram ./internal/highlight ./internal/site
 FILE        ?= testdata/regression.md
 SITE_DIR    := _site
+SHOTS_DIR   := docs/themes
+CHROME      ?= /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build install run test vet vet-windows fmt fmt-check golden tidy tidy-check check clean site release-check release-snapshot
+.PHONY: help build install run test vet vet-windows fmt fmt-check golden tidy tidy-check check clean site screenshots release-check release-snapshot
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -48,6 +50,18 @@ check: fmt-check tidy-check vet vet-windows test ## Run the format and tidy chec
 
 site: ## Build the landing page into ./_site
 	go run ./cmd/termd-site $(SITE_DIR)
+
+screenshots: ## Render a PNG of every theme into docs/themes (needs Google Chrome and ImageMagick)
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && \
+	go run ./cmd/termd-site -shots "$$tmp" && mkdir -p $(SHOTS_DIR) && \
+	for page in "$$tmp"/*.html; do \
+		name=$$(basename "$$page" .html); \
+		"$(CHROME)" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+			--default-background-color=00000000 --window-size=700,900 \
+			--screenshot="$$tmp/$$name.png" "file://$$page" >/dev/null 2>&1 && \
+		magick "$$tmp/$$name.png" -trim +repage "$(SHOTS_DIR)/$$name.png" && \
+		echo "$(SHOTS_DIR)/$$name.png" || exit 1; \
+	done
 
 release-check: ## Validate the GoReleaser config
 	goreleaser check

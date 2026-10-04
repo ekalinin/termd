@@ -115,3 +115,19 @@ func TestRecognizedFile(t *testing.T) {
 		t.Errorf("main.go is highlighted differently from a go block\n got %q\nwant %q", got, want)
 	}
 }
+
+func TestColors(t *testing.T) {
+	tests := []struct {
+		theme  Theme
+		fg, bg style.Color
+	}{
+		{Dark, style.RGB(0xe6, 0xed, 0xf3), style.RGB(0x0d, 0x11, 0x17)},
+		{"dracula", style.RGB(0xf8, 0xf8, 0xf2), style.RGB(0x28, 0x2a, 0x36)},
+		{"nord", style.RGB(0xd8, 0xde, 0xe9), style.RGB(0x2e, 0x34, 0x40)},
+	}
+	for _, tt := range tests {
+		if fg, bg := tt.theme.Colors(); fg != tt.fg || bg != tt.bg {
+			t.Errorf("%s: colors %+v on %+v, want %+v on %+v", tt.theme, fg, bg, tt.fg, tt.bg)
+		}
+	}
+}

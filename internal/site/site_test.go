@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/ekalinin/termd/internal/theme"
 )
 
 var (
@@ -205,6 +208,141 @@ func TestBuild(t *testing.T) {
 	for _, name := range []string{"index.html", "style.css"} {
 		if fi, err := os.Stat(filepath.Join(dir, name)); err != nil || fi.Size() == 0 {
 			t.Errorf("%s not written: %v", name, err)
+		}
+	}
+}
+
+// lightThemes are the themes whose showcase window has a light background.
+var lightThemes = []string{"light", "solarized-light", "gruvbox-light", "catppuccin-latte"}
+
+func TestShowcaseMatchesRenderer(t *testing.T) {
+	showcase, err := Showcase()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(showcase) != len(widths) {
+		t.Fatalf("%d widths, want %d", len(showcase), len(widths))
+	}
+	for i, w := range showcase {
+		if w.Cols != widths[i] {
+			t.Errorf("width %d is %d columns, want %d", i, w.Cols, widths[i])
+		}
+		var names []string
+		for _, win := range w.Windows {
+			names = append(names, win.Theme)
+		}
+		if !slices.Equal(names, theme.Names()) {
+			t.Fatalf("width %d: themes %q, want %q", w.Cols, names, theme.Names())
+		}
+		for _, win := range w.Windows {
+			th, _ := theme.Get(win.Theme)
+			want := escRE.ReplaceAllString(renderTheme(themesMD, w.Cols, th), "")
+			got := html.UnescapeString(tagRE.ReplaceAllString(string(win.HTML), ""))
+			if got != want {
+				t.Errorf("%s at %d: text differs from the renderer\n--- want\n%s\n--- got\n%s", win.Theme, w.Cols, want, got)
+			}
+		}
+	}
+}
+
+func TestShowcasePage(t *testing.T) {
+	p := page(t)
+	section := strings.Index(p, `<section class="showcase"`)
+	if section < 0 || section < strings.LastIndex(p, `<section class="example"`) {
+		t.Fatal("no showcase section after the examples")
+	}
+	last := section
+	for _, name := range theme.Names() {
+		input := `<input type="radio" name="termd-theme" id="termd-theme-` + name + `"`
+		i := strings.Index(p, input)
+		if i < last {
+			t.Errorf("no switcher input for %s after the previous one", name)
+		}
+		last = i
+		checked := strings.HasPrefix(p[i+len(input):], " checked")
+		if checked != (name == "dark") {
+			t.Errorf("%s checked = %v", name, checked)
+		}
+		if rule := ":root:has(#termd-theme-" + name + ":checked) .showcase .theme-" + name + " "; !strings.Contains(p, rule) {
+			t.Errorf("no rule %q", rule)
+		}
+		scheme := "color-scheme:dark"
+		if slices.Contains(lightThemes, name) {
+			scheme = "color-scheme:light"
+		}
+		for _, cols := range widths {
+			title := fmt.Sprintf("termd --width %d --theme %s themes.md</figcaption>", cols, name)
+			if !strings.Contains(p, title) {
+				t.Errorf("no window titled %q", title)
+			}
+		}
+		window := `<figure class="window theme-` + name + `" style="` + scheme
+		if n := strings.Count(p, window); n != len(widths) {
+			t.Errorf("%d windows starting with %q, want %d", n, window, len(widths))
+		}
+	}
+	if !strings.Contains(p, `<figure class="window theme-dracula" style="color-scheme:dark;--win-bg:#282a36;--win-fg:#f8f8f2">`) {
+		t.Error("dracula window does not have the colors of the dracula style")
+	}
+}
+
+func TestBuildShots(t *testing.T) {
+	dir := t.TempDir()
+	if err := BuildShots(dir); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != len(theme.Names())+1 {
+		t.Errorf("%d files written, want a page per theme and style.css", len(entries))
+	}
+	if fi, err := os.Stat(filepath.Join(dir, "style.css")); err != nil || fi.Size() == 0 {
+		t.Errorf("style.css not written: %v", err)
+	}
+	preRE := regexp.MustCompile(`(?s)<pre class="term">(.*)</pre>`)
+	for _, name := range theme.Names() {
+		b, err := os.ReadFile(filepath.Join(dir, name+".html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := string(b)
+		if n := strings.Count(p, "<figure"); n != 1 || !strings.Contains(p, `<figure class="window theme-`+name+`" style="`) {
+			t.Errorf("%s: %d windows, want one of the theme", name, n)
+		}
+		if title := "termd --width 60 --theme " + name + " themes.md</figcaption>"; !strings.Contains(p, title) {
+			t.Errorf("%s: no title %q", name, title)
+		}
+		if strings.Contains(p, `class="ruler"`) {
+			t.Errorf("%s: page has a ruler", name)
+		}
+		m := preRE.FindStringSubmatch(p)
+		if m == nil {
+			t.Fatalf("%s: no output", name)
+		}
+		th, _ := theme.Get(name)
+		want := escRE.ReplaceAllString(renderTheme(themesMD, 60, th), "")
+		if got := html.UnescapeString(tagRE.ReplaceAllString(m[1], "")); got != want {
+			t.Errorf("%s: text differs from the renderer\n--- want\n%s\n--- got\n%s", name, want, got)
+		}
+	}
+}
+
+// TestThemeScreenshots checks that every theme has a screenshot in
+// docs/themes and that the README shows it.
+func TestThemeScreenshots(t *testing.T) {
+	readme, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range theme.Names() {
+		file := "docs/themes/" + name + ".png"
+		if fi, err := os.Stat("../../" + file); err != nil || fi.Size() == 0 {
+			t.Errorf("%s: no screenshot %s (run make screenshots): %v", name, file, err)
+		}
+		if !strings.Contains(string(readme), "("+file+")") {
+			t.Errorf("%s: README does not show %s", name, file)
 		}
 	}
 }

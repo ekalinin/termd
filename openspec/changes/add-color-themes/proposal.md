@@ -12,11 +12,12 @@ termd's colors are fixed: outside code blocks it uses the basic palette of the t
 - The other themes use 24-bit colors from their own palettes, written by hand for each theme, converted to the 256-color palette when the terminal does not advertise truecolor, as code colors are today.
 - `--theme` accepts `auto` and every theme name. The `TERMD_THEME` environment variable selects the theme when the flag is not given; the flag wins over the variable, and `auto` is used when neither is set. An invalid value of the flag or of the variable is a usage error with exit status 2, and the message names the flag or the variable.
 - The theme names are listed in the `--help` text of `--theme`, in the usage error and in the README. There is no `--list-themes` flag.
+- The landing page gets a theme showcase after the examples: one document written for the site, rendered with every theme, with its own theme switcher and in the background and text colors of the selected theme. The page theme switcher (auto, light, dark) keeps its job for the page and the other examples.
+- The README shows a screenshot of the same document in every theme. The PNG files are committed and made from the showcase HTML by one maintainer command, `make screenshots`, which needs Google Chrome and ImageMagick; the site build and CI do not.
 
 Out of scope:
 
 - Theme files defined by the user and a configuration file; a separate change.
-- A showcase of the themes on the landing page; the page keeps its dark and light renderings, also a separate change.
 - Background colors, colors for emphasis, strong and strikethrough text, footnote references and task checkboxes, a style per heading level, and colors in diagrams.
 - Theme families that pick a dark or light variant by the terminal background, and themes made from all chroma styles automatically.
 
@@ -28,6 +29,7 @@ Out of scope:
 ### Modified Capabilities
 - `cli`: the highlighting theme selection becomes theme selection: the `--theme` values, the `TERMD_THEME` environment variable, its precedence and its usage error.
 - `markdown-rendering`: GitHub alert colors come from the theme; the basic palette colors stay for the `dark` and `light` themes.
+- `project-site`: the page contains a theme showcase with its own switcher, and the README shows a screenshot of every theme made by a maintainer command.
 
 ## Impact
 
@@ -38,5 +40,7 @@ Out of scope:
 - `internal/table`: header and border styles become fields of `Table`.
 - `cmd/termd`: theme resolution from the flag, `TERMD_THEME` and `auto`; usage text and errors.
 - Tests: golden output of every named theme; the existing golden files must not change.
-- `README.md`: the flags table, the theme section of "How it works".
-- `internal/site`: no change in behavior.
+- `README.md`: the flags table, the theme section of "How it works", the grid of theme screenshots.
+- `internal/site`: the existing examples do not change; a showcase section, its switcher and one page per theme for the screenshots are added.
+- `internal/highlight`: the text and background colors of a highlighting style, for the showcase windows.
+- `cmd/termd-site`: a flag that writes the screenshot pages; `Makefile`: the `screenshots` target; `docs/themes/`: the PNG files.

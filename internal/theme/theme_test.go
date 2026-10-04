@@ -131,3 +131,14 @@ func TestSpotColors(t *testing.T) {
 		}
 	}
 }
+
+func TestWindowColors(t *testing.T) {
+	for _, name := range specNames {
+		th, _ := Get(name)
+		// github, the style of light, defines no text color: a light
+		// terminal keeps its own.
+		if fg, bg := th.Code.Colors(); !bg.Set || (!fg.Set && name != "light") {
+			t.Errorf("%s: text color %+v, background %+v", name, fg, bg)
+		}
+	}
+}

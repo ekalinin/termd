@@ -14,17 +14,24 @@ import (
 	"github.com/ekalinin/termd/internal/highlight"
 	"github.com/ekalinin/termd/internal/render"
 	"github.com/ekalinin/termd/internal/style"
+	"github.com/ekalinin/termd/internal/termbg"
+	"github.com/ekalinin/termd/internal/theme"
 )
 
 var (
 	//go:embed examples/*.md
 	examplesFS embed.FS
+	//go:embed themes.md
+	themesMD []byte
 	//go:embed page.html
 	pageHTML string
+	//go:embed shot.html
+	shotHTML string
 	//go:embed style.css
 	styleCSS []byte
 
 	pageTmpl = template.Must(template.New("page").Funcs(template.FuncMap{"ruler": ruler}).Parse(pageHTML))
+	shotTmpl = template.Must(template.New("shot").Parse(shotHTML))
 )
 
 const (
@@ -122,6 +129,86 @@ func Examples() ([]Example, error) {
 	return out, nil
 }
 
+// defaultShowcaseTheme is the theme the showcase shows when the page opens.
+const defaultShowcaseTheme = "dark"
+
+// shotWidth is the width of the showcase in the screenshots of the README.
+const shotWidth = 60
+
+// ShowcaseWindow is the showcase document rendered with one theme. Style is
+// the inline CSS of the window: its color scheme and colors.
+type ShowcaseWindow struct {
+	Theme string
+	Style template.CSS
+	HTML  template.HTML
+}
+
+// ShowcaseWidth holds the showcase windows at one width, one per theme in
+// the order of theme.Names.
+type ShowcaseWidth struct {
+	Cols    int
+	Windows []ShowcaseWindow
+}
+
+// renderTheme returns termd's styled output for src with a built-in theme.
+func renderTheme(src []byte, width int, th theme.Theme) string {
+	return render.Render(src, render.Options{
+		Width:   width,
+		Style:   style.Options{Styled: true, Hyperlinks: true, Depth: style.TrueColor},
+		Theme:   func() highlight.Theme { return th.Code },
+		Palette: th.Palette,
+	})
+}
+
+// Showcase renders the showcase document at every width with every theme.
+func Showcase() ([]ShowcaseWidth, error) {
+	var out []ShowcaseWidth
+	for _, cols := range widths {
+		w := ShowcaseWidth{Cols: cols}
+		for _, name := range theme.Names() {
+			win, err := showcaseWindow(name, cols)
+			if err != nil {
+				return nil, err
+			}
+			w.Windows = append(w.Windows, win)
+		}
+		out = append(out, w)
+	}
+	return out, nil
+}
+
+// showcaseWindow renders the showcase document with the named theme.
+func showcaseWindow(name string, cols int) (ShowcaseWindow, error) {
+	th, _ := theme.Get(name)
+	h, err := HTML(renderTheme(themesMD, cols, th))
+	if err != nil {
+		return ShowcaseWindow{}, fmt.Errorf("theme showcase at width %d (%s theme): %w", cols, name, err)
+	}
+	return ShowcaseWindow{Theme: name, Style: windowStyle(th), HTML: template.HTML(h)}, nil
+}
+
+// windowStyle returns the inline CSS of a showcase window: the color scheme
+// that matches the background, so the basic palette colors suit it, and the
+// background and text colors of the theme's highlighting style as variables.
+// Without a text color the window keeps the page's one for its scheme.
+func windowStyle(th theme.Theme) template.CSS {
+	fg, bg := th.Code.Colors()
+	scheme := "dark"
+	if termbg.Luminance(float64(bg.R)/255, float64(bg.G)/255, float64(bg.B)/255) >= 0.5 {
+		scheme = "light"
+	}
+	css := "color-scheme:" + scheme + ";--win-bg:" + hexColor(bg)
+	if fg.Set {
+		css += ";--win-fg:" + hexColor(fg)
+	}
+	return template.CSS(css)
+}
+
+// hexColor formats c as #rrggbb.
+func hexColor(c style.Color) string {
+	return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B)
+}
+
 // ruler returns a column ruler n columns wide, as terminal editors draw it:
 // "----+----1----+----2", with the tens digits in <b>.
 func ruler(n int) template.HTML {
@@ -145,13 +232,21 @@ func Page() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	showcase, err := Showcase()
+	if err != nil {
+		return nil, err
+	}
 	data := struct {
 		Description, Install, Repo, License string
 		Release, Badge                      string
 		Widths                              []int
 		DefaultWidth                        int
 		Examples                            []Example
-	}{description, installCommand, repoURL, licenseURL, releaseURL, badgeURL, widths, defaultWidth, examples}
+		Themes                              []string
+		DefaultTheme                        string
+		Showcase                            []ShowcaseWidth
+	}{description, installCommand, repoURL, licenseURL, releaseURL, badgeURL, widths, defaultWidth, examples,
+		theme.Names(), defaultShowcaseTheme, showcase}
 	var b bytes.Buffer
 	if err := pageTmpl.Execute(&b, data); err != nil {
 		return nil, err
@@ -170,6 +265,33 @@ func Build(dir string) error {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "index.html"), page, 0o644); err != nil {
 		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "style.css"), styleCSS, 0o644)
+}
+
+// BuildShots writes style.css and one page per theme into dir, creating it
+// when needed: the showcase window of the theme at shotWidth columns on a
+// transparent page, for the screenshots of the README.
+func BuildShots(dir string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	for _, name := range theme.Names() {
+		win, err := showcaseWindow(name, shotWidth)
+		if err != nil {
+			return err
+		}
+		data := struct {
+			ShowcaseWindow
+			Cols int
+		}{win, shotWidth}
+		var b bytes.Buffer
+		if err := shotTmpl.Execute(&b, data); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, name+".html"), b.Bytes(), 0o644); err != nil {
+			return err
+		}
 	}
 	return os.WriteFile(filepath.Join(dir, "style.css"), styleCSS, 0o644)
 }

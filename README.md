@@ -100,6 +100,24 @@ A diagram type that is not supported yet:
 └────────────────────────────────────────────┘
 ```
 
+The same document in every [theme](#themes) at `--width 60`:
+
+| `dark` | `light` | `dracula` |
+|---|---|---|
+| ![dark theme](docs/themes/dark.png) | ![light theme](docs/themes/light.png) | ![dracula theme](docs/themes/dracula.png) |
+
+| `nord` | `onedark` | `monokai` |
+|---|---|---|
+| ![nord theme](docs/themes/nord.png) | ![onedark theme](docs/themes/onedark.png) | ![monokai theme](docs/themes/monokai.png) |
+
+| `solarized-dark` | `solarized-light` | `gruvbox` |
+|---|---|---|
+| ![solarized-dark theme](docs/themes/solarized-dark.png) | ![solarized-light theme](docs/themes/solarized-light.png) | ![gruvbox theme](docs/themes/gruvbox.png) |
+
+| `gruvbox-light` | `catppuccin-mocha` | `catppuccin-latte` |
+|---|---|---|
+| ![gruvbox-light theme](docs/themes/gruvbox-light.png) | ![catppuccin-mocha theme](docs/themes/catppuccin-mocha.png) | ![catppuccin-latte theme](docs/themes/catppuccin-latte.png) |
+
 ## How it works
 
 ### Output width and modes
@@ -194,6 +212,7 @@ make check    # format check, go.mod tidiness check, go vet (host and Windows) a
 make run      # render testdata/regression.md
 make run FILE=README.md
 make golden   # regenerate golden files after an intended output change
+make screenshots  # render the theme screenshots into docs/themes
 ```
 
 | Path | Contents |
@@ -209,6 +228,7 @@ make golden   # regenerate golden files after an intended output change
 | `internal/termbg/` | terminal background color query |
 | `internal/golden/` | golden-file test helper |
 | `testdata/` | markdown fixtures and golden outputs |
+| `docs/themes/` | theme screenshots for the README |
 | `openspec/` | specifications and change proposals |
 
 ### Golden files
@@ -252,6 +272,10 @@ go test ./internal/render -run 'TestGolden/tables' -update
 ```
 
 The `-update` flag exists only in the packages with golden tests, so pass it per package, as `make golden` does; `go test ./... -update` fails with `flag provided but not defined: -update`.
+
+### Theme screenshots
+
+The screenshots in [Examples](#examples) are PNG files in `docs/themes/`, one per theme. `make screenshots` makes them from the theme showcase of the landing page: `go run ./cmd/termd-site -shots DIR` writes one page per theme with the showcase document at 60 columns, Google Chrome takes a screenshot of each page, and ImageMagick trims it. Both have to be installed; set `CHROME` when Chrome is not at its macOS location. Run it after changing a palette or `internal/site/themes.md`, and commit the files with the change. `make check` fails when a theme has no screenshot or the README does not show it.
 
 ### Releases
 

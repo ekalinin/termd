@@ -27,6 +27,22 @@ func (t Theme) styleName() string {
 	return string(t)
 }
 
+// Colors returns the text and the background color of the theme's chroma
+// style, the colors of a terminal the style is made for. A color the style
+// does not define is not set.
+func (t Theme) Colors() (fg, bg style.Color) {
+	e := styles.Get(t.styleName()).Get(chroma.Text)
+	return rgb(e.Colour), rgb(e.Background)
+}
+
+// rgb converts a chroma color; an unset one gives the zero Color.
+func rgb(c chroma.Colour) style.Color {
+	if !c.IsSet() {
+		return style.Color{}
+	}
+	return style.RGB(c.Red(), c.Green(), c.Blue())
+}
+
 // Language returns the lower-cased first word of a code block info string.
 func Language(info string) string {
 	fields := strings.Fields(info)

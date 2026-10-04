@@ -70,6 +70,30 @@ func TestTo256(t *testing.T) {
 	}
 }
 
+func TestLayer(t *testing.T) {
+	tests := []struct {
+		name      string
+		base, top Style
+		want      Style
+	}{
+		{"attributes are combined", Style{Bold: true, Faint: true}, Style{Italic: true, Underline: true, Strike: true},
+			Style{Bold: true, Faint: true, Italic: true, Underline: true, Strike: true}},
+		{"basic color replaces 24-bit color", Style{Bold: true, FG: RGB(1, 2, 3)}, Style{ANSI: 36},
+			Style{Bold: true, ANSI: 36}},
+		{"24-bit color replaces basic color", Style{Underline: true, ANSI: 34}, Style{FG: RGB(1, 2, 3)},
+			Style{Underline: true, FG: RGB(1, 2, 3)}},
+		{"top without color keeps base color", Style{ANSI: 34}, Style{Bold: true},
+			Style{Bold: true, ANSI: 34}},
+		{"zero top returns base", Style{Bold: true, FG: RGB(1, 2, 3)}, Style{},
+			Style{Bold: true, FG: RGB(1, 2, 3)}},
+	}
+	for _, tt := range tests {
+		if got := Layer(tt.base, tt.top); got != tt.want {
+			t.Errorf("%s: Layer(%+v, %+v) = %+v, want %+v", tt.name, tt.base, tt.top, got, tt.want)
+		}
+	}
+}
+
 func TestLinkSequences(t *testing.T) {
 	o := Options{Hyperlinks: true}
 	if got := o.LinkOpen("https://example.com"); got != "\x1b]8;;https://example.com\x1b\\" {

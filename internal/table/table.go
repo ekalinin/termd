@@ -29,6 +29,11 @@ type Table struct {
 	Header []Cell
 	Rows   [][]Cell
 	Align  []Align
+	// HeaderStyle is applied under the spans of the header cells: its
+	// attributes are added, and its color is used for spans without one.
+	HeaderStyle style.Style
+	// BorderStyle styles the column separators and the rule under the header.
+	BorderStyle style.Style
 }
 
 const (
@@ -36,8 +41,6 @@ const (
 	sepWidth = 3
 	ruleSep  = "─┼─"
 )
-
-var headerStyle = style.Style{Bold: true}
 
 // cell returns cell i of row, or an empty cell for missing ones.
 func cell(row []Cell, i int) Cell {
@@ -168,7 +171,7 @@ func (t Table) Render(width int) (lines []text.Line, wide bool) {
 	if len(t.Header) > 0 {
 		header := make([]Cell, len(t.Header))
 		for i, c := range t.Header {
-			header[i] = withStyle(c, headerStyle)
+			header[i] = withStyle(c, t.HeaderStyle)
 		}
 		lines = append(lines, t.row(header, widths)...)
 
@@ -176,7 +179,11 @@ func (t Table) Render(width int) (lines []text.Line, wide bool) {
 		for i, w := range widths {
 			parts[i] = strings.Repeat("─", w)
 		}
-		lines = append(lines, text.Plain(strings.Join(parts, ruleSep)))
+		rule := text.Plain(strings.Join(parts, ruleSep))
+		for i := range rule {
+			rule[i].Style = t.BorderStyle
+		}
+		lines = append(lines, rule)
 	}
 
 	for _, row := range t.Rows {
@@ -199,7 +206,7 @@ func (t Table) row(row []Cell, widths []int) []text.Line {
 		var l text.Line
 		for i, w := range widths {
 			if i > 0 {
-				l = append(l, text.Span{Text: sep})
+				l = append(l, text.Span{Text: sep, Style: t.BorderStyle})
 			}
 			var part text.Line
 			if j < len(wrapped[i]) {
@@ -225,11 +232,12 @@ func (t Table) alignByte(i int) byte {
 	return 'l'
 }
 
-// withStyle adds bold (or another attribute set) on top of each span.
+// withStyle applies each span over s: the attributes of s are added, and
+// the color of s is used for spans without a color of their own.
 func withStyle(c Cell, s style.Style) Cell {
 	out := make(Cell, len(c))
 	for i, sp := range c {
-		sp.Style.Bold = sp.Style.Bold || s.Bold
+		sp.Style = style.Layer(s, sp.Style)
 		out[i] = sp
 	}
 	return out

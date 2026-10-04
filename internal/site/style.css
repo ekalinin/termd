@@ -217,6 +217,33 @@ main { padding: 1rem 0 2rem; }
 :root:has(#theme-light:checked) .window.dark,
 :root:has(#theme-dark:checked) .window.light { display: none; }
 
+/* Theme showcase: one window per theme, the one of the checked theme is
+   shown. A window takes the background and text colors of the theme
+   (inline --win-bg and --win-fg) and its color scheme, so the basic palette
+   colors of the dark and light themes suit the window, not the page. */
+.showcase { margin: 2.5rem 0; }
+.showcase > .group { align-items: flex-start; margin-bottom: 1rem; }
+.showcase > .group .label { padding-top: .45rem; white-space: nowrap; }
+.showcase .seg { flex-wrap: wrap; }
+.showcase .window {
+  display: none;
+  --win-fg: var(--term-fg);
+  background: var(--win-bg);
+  border-color: color-mix(in srgb, var(--win-fg) 16%, var(--win-bg));
+}
+.showcase .titlebar {
+  background: color-mix(in srgb, var(--win-fg) 7%, var(--win-bg));
+  border-bottom-color: color-mix(in srgb, var(--win-fg) 16%, var(--win-bg));
+  color: color-mix(in srgb, var(--win-fg) 60%, var(--win-bg));
+}
+.showcase .term { color: var(--win-fg); }
+.showcase .ruler { color: color-mix(in srgb, var(--win-fg) 25%, var(--win-bg)); }
+.showcase .ruler b { color: color-mix(in srgb, var(--win-fg) 55%, var(--win-bg)); }
+/* A screenshot page (termd-site -shots): one showcase window on a
+   transparent page, without the shadow, which trimming would keep. */
+.shot { max-width: none; margin: 0; padding: 0; background: transparent; }
+.shot .window { display: block; box-shadow: none; }
+
 footer {
   display: flex;
   gap: 1.5rem;

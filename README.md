@@ -10,6 +10,7 @@ Existing terminal viewers often break tables (truncated headers, words split in 
 - **Mermaid diagrams as text** - `sequenceDiagram`, `flowchart`/`graph` and `erDiagram` are drawn with box-drawing characters. Any other diagram is shown as its source in a labelled frame instead of failing.
 - **Frontmatter** - a YAML frontmatter block is shown as a table of its keys and values at the top of the document.
 - **Syntax highlighting** - fenced code blocks with a known language are highlighted, with a dark or light theme chosen by the terminal background.
+- **Color themes** - `dark` and `light` follow the color scheme of the terminal; ten named themes such as `dracula`, `nord` or `catppuccin-mocha` color headings, links, inline code, markers, alerts, tables and code with the palette of their scheme.
 - **Clickable links** - links are OSC 8 terminal hyperlinks, so a table cell shows `docs` instead of a long URL.
 - **Paging** - long or wide output opens in `less -RS`.
 - **Pipe-friendly** - when stdout is not a terminal, the output is plain text without escape sequences.
@@ -52,7 +53,7 @@ termd --version             # print the version
 | `--width` | positive number | terminal width, or 80 when not a terminal | output width in columns |
 | `--no-pager` | | off | print directly instead of paging through `less` |
 | `--hyperlinks` | `auto`, `always`, `never` | `auto` | terminal hyperlinks; `auto` enables them only when stdout is a terminal |
-| `--theme` | `auto`, `dark`, `light` | `auto` | code highlighting theme; `auto` asks the terminal for its background color |
+| `--theme` | `auto` or a theme name | `TERMD_THEME`, or `auto` when it is not set | color theme, see [Themes](#themes); `auto` asks the terminal for its background color |
 | `--version` | | | print the version and exit |
 
 Exit status: `0` when the document was rendered (even if some diagrams were shown as source), `1` when the file cannot be read, `2` on a usage error.
@@ -67,8 +68,8 @@ Option  │ Type   │ Default │ Description
 --width │ int    │ 80      │ Maximum output width in
         │        │         │ terminal columns, after which
         │        │         │ text wraps
---theme │ string │ auto    │ Code highlighting theme: auto,
-        │        │         │ dark or light
+--theme │ string │ auto    │ Color theme: auto or the name
+        │        │         │ of a built-in theme
 ```
 
 A mermaid sequence diagram with `autonumber`, activation and a note:
@@ -99,6 +100,24 @@ A diagram type that is not supported yet:
 └────────────────────────────────────────────┘
 ```
 
+The same document in every [theme](#themes) at `--width 60`:
+
+| `dark` | `light` | `dracula` |
+|---|---|---|
+| ![dark theme](docs/themes/dark.png) | ![light theme](docs/themes/light.png) | ![dracula theme](docs/themes/dracula.png) |
+
+| `nord` | `onedark` | `monokai` |
+|---|---|---|
+| ![nord theme](docs/themes/nord.png) | ![onedark theme](docs/themes/onedark.png) | ![monokai theme](docs/themes/monokai.png) |
+
+| `solarized-dark` | `solarized-light` | `gruvbox` |
+|---|---|---|
+| ![solarized-dark theme](docs/themes/solarized-dark.png) | ![solarized-light theme](docs/themes/solarized-light.png) | ![gruvbox theme](docs/themes/gruvbox.png) |
+
+| `gruvbox-light` | `catppuccin-mocha` | `catppuccin-latte` |
+|---|---|---|
+| ![gruvbox-light theme](docs/themes/gruvbox-light.png) | ![catppuccin-mocha theme](docs/themes/catppuccin-mocha.png) | ![catppuccin-latte theme](docs/themes/catppuccin-latte.png) |
+
 ## How it works
 
 ### Output width and modes
@@ -123,11 +142,21 @@ When the document is read from a file, relative destinations of links and images
 
 A footnote reference is shown as `[1]`. Footnotes are numbered in the order of their first reference, not by their labels. The definitions are shown at the end of the document, after a horizontal line, as a numbered list in the order of their numbers; a definition with several paragraphs is laid out like a list item. A definition that is never referenced is not shown. The reference is not a hyperlink, because a terminal hyperlink cannot jump to another place of the output, and there are no back-references from a definition to its reference.
 
+### Themes
+
+A theme sets the colors of the whole document. `--theme` selects it; without the flag, the `TERMD_THEME` environment variable does, and without both termd uses `auto`. A `--theme` on the command line, `--theme=auto` included, wins over the variable, and the variable is then not checked. An unknown name in the value that is used is a usage error with exit status 2, also when the output goes to a pipe; the message names the flag or the variable and lists the valid values, which `termd --help` lists too.
+
+`dark` and `light` use the attributes and the basic colors of the terminal, so they follow its color scheme: bold headings, cyan inline code, underlined blue links, faint list markers, horizontal lines and quote markers, alerts in their colors, bold table headers and frontmatter keys. They differ only in the colors of code blocks, chroma's `github-dark` and `github` styles. `auto` picks one of them, see "Code highlighting".
+
+The other themes use 24-bit colors from the palette of their color scheme, and the chroma style of the same name for code blocks: `dracula`, `nord`, `onedark`, `monokai`, `solarized-dark`, `solarized-light`, `gruvbox`, `gruvbox-light`, `catppuccin-mocha` and `catppuccin-latte`. Headings, table headers and frontmatter keys are bold in the heading color of the theme, links are underlined in its link color, list markers, horizontal lines, quote markers and table borders take its marker color without being faint, and alerts take its blue, green, purple, yellow and red. These themes never query the terminal and do not adapt to its background: `solarized-light`, `gruvbox-light` and `catppuccin-latte` are made for a light background, the others for a dark one.
+
+In every theme, the style of an inner element wins: inline code in a link keeps the inline code color, a link in a heading takes the link color and stays bold. No theme colors paragraph text, emphasis, footnote references, task checkboxes or diagrams, and no theme sets a background color. In a pipe, the output is the same with every theme.
+
 ### Code highlighting
 
 A fenced code block is highlighted when the first word of its info string names a language known to [chroma](https://github.com/alecthomas/chroma) (names and common aliases such as `js`, `sh`, `yml`). Blocks without a language or with an unknown one are shown without colors; the text of a block is never changed.
 
-With `--theme=auto`, termd asks the terminal for its background color (OSC 11) and waits at most 100 ms for the answer; a light background selects the light theme, anything else the dark one. The query is sent only when the document has a code block to highlight. Colors are 24-bit when `COLORTERM` is `truecolor` or `24bit`, and the nearest 256-color palette colors otherwise.
+With `--theme=auto`, termd asks the terminal for its background color (OSC 11) and waits at most 100 ms for the answer; a light background selects the `light` theme, anything else the `dark` one. Since the two differ only in code colors, the query is sent only when the document has a code block to highlight. A theme name never sends the query. Code colors and the colors of the named themes are 24-bit when `COLORTERM` is `truecolor` or `24bit`, and the nearest 256-color palette colors otherwise.
 
 ### Code files
 
@@ -155,7 +184,7 @@ A block that is not valid YAML is shown as source in a frame labelled `frontmatt
 
 ### Alerts
 
-A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, alone on the line and in any case, is shown as a GitHub alert: the marker line is replaced by the title `Note`, `Tip`, `Important`, `Warning` or `Caution`, and the rest of the quote follows under it. In a terminal the title is bold, and the title and the quote marker take the color of the alert type from the terminal palette: blue for a note, green for a tip, purple for important, yellow for a warning and red for a caution. In plain text the title follows the usual quote marker. A quote with another marker, such as `[!FOO]`, or with text after the marker on the same line stays a regular quote. Alerts have no icons, because terminals disagree on the width of emoji.
+A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, alone on the line and in any case, is shown as a GitHub alert: the marker line is replaced by the title `Note`, `Tip`, `Important`, `Warning` or `Caution`, and the rest of the quote follows under it. In a terminal the title is bold, and the title and the quote marker take the color of the alert type: with the `dark` and `light` themes from the terminal palette, blue for a note, green for a tip, purple for important, yellow for a warning and red for a caution, and with the other themes from the palette of the theme. In plain text the title follows the usual quote marker. A quote with another marker, such as `[!FOO]`, or with text after the marker on the same line stays a regular quote. Alerts have no icons, because terminals disagree on the width of emoji.
 
 ## Limitations
 
@@ -165,7 +194,7 @@ A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNIN
 - Terminals disagree on the width of emoji with a variation selector (for example `⚠️`). termd follows Unicode and counts 2 columns; in iTerm2 this matches the "Use Unicode version 9+ widths" setting.
 - In plain mode a long URL is an unbreakable word and can push a table beyond the output width.
 - GNU screen does not support hyperlinks; use `--hyperlinks=never` there.
-- Background detection works on macOS, Linux and the BSDs; elsewhere the dark theme is used unless `--theme` is given.
+- Background detection works on macOS, Linux and the BSDs; elsewhere the dark theme is used unless `--theme` or `TERMD_THEME` is given.
 - TOML (`+++`) frontmatter is rendered as markdown.
 
 ## Roadmap
@@ -183,6 +212,7 @@ make check    # format check, go.mod tidiness check, go vet (host and Windows) a
 make run      # render testdata/regression.md
 make run FILE=README.md
 make golden   # regenerate golden files after an intended output change
+make screenshots  # render the theme screenshots into docs/themes
 ```
 
 | Path | Contents |
@@ -193,10 +223,12 @@ make golden   # regenerate golden files after an intended output change
 | `internal/table/` | table layout |
 | `internal/diagram/` | diagram detection, mermaid-ascii adapter, framed-source fallback |
 | `internal/highlight/` | syntax highlighting |
+| `internal/theme/` | color themes |
 | `internal/style/` | SGR and OSC 8 escape sequences |
 | `internal/termbg/` | terminal background color query |
 | `internal/golden/` | golden-file test helper |
 | `testdata/` | markdown fixtures and golden outputs |
+| `docs/themes/` | theme screenshots for the README |
 | `openspec/` | specifications and change proposals |
 
 ### Golden files
@@ -207,6 +239,7 @@ The golden files and the tests that use them:
 
 - `testdata/golden/<name>.w<width>.<mode>.golden` - every `testdata/<name>.md` rendered at widths 40, 60 and 80 in `plain` and `styled` modes (`TestGolden` in `internal/render`).
 - `testdata/golden/<file>.styled.golden` - every file in `testdata/codefiles/` rendered as a code file in `styled` mode; its `plain` output must be the file itself (`TestCodeFileGolden` in `internal/render`).
+- `testdata/golden/theme.<name>.golden` - `testdata/themes/sample.md` rendered at width 60 in `styled` mode with every theme (`TestThemeGolden` in `internal/render`).
 - `internal/diagram/testdata/<name>.golden` - every diagram fixture in the same directory, rendered at width 200 (`TestGolden` in `internal/diagram`).
 - `internal/highlight/testdata/<lang>.<theme>.<depth>.golden` - code samples in `go`, `python` and `sh` with the `dark` and `light` themes in `truecolor` and `256` colors (`TestHighlightGolden` in `internal/highlight`).
 
@@ -239,6 +272,10 @@ go test ./internal/render -run 'TestGolden/tables' -update
 ```
 
 The `-update` flag exists only in the packages with golden tests, so pass it per package, as `make golden` does; `go test ./... -update` fails with `flag provided but not defined: -update`.
+
+### Theme screenshots
+
+The screenshots in [Examples](#examples) are PNG files in `docs/themes/`, one per theme. `make screenshots` makes them from the theme showcase of the landing page: `go run ./cmd/termd-site -shots DIR` writes one page per theme with the showcase document at 60 columns, Google Chrome takes a screenshot of each page, and ImageMagick trims it. Both have to be installed; set `CHROME` when Chrome is not at its macOS location. Run it after changing a palette or `internal/site/themes.md`, and commit the files with the change. `make check` fails when a theme has no screenshot or the README does not show it.
 
 ### Releases
 

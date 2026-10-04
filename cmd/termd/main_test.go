@@ -21,6 +21,7 @@ type fake struct {
 	width       int
 	height      int
 	colorterm   string
+	termdTheme  string
 	hasLess     bool
 	light       bool
 	lightOK     bool
@@ -39,8 +40,11 @@ func (f *fake) env() env {
 		stdoutTTY: f.stdoutTTY,
 		size:      func() (int, int, bool) { return f.width, f.height, f.width > 0 },
 		getenv: func(k string) string {
-			if k == "COLORTERM" {
+			switch k {
+			case "COLORTERM":
 				return f.colorterm
+			case "TERMD_THEME":
+				return f.termdTheme
 			}
 			return ""
 		},
@@ -519,6 +523,91 @@ func TestDetectedThemeIsUsed(t *testing.T) {
 	if got := render(nil, false, false); got != darkOut {
 		t.Error("no answer did not fall back to the dark theme")
 	}
+}
+
+// wantThemeValues are the --theme values in the order of the cli spec.
+var wantThemeValues = "auto, dark, light, dracula, nord, onedark, monokai, solarized-dark, solarized-light, " +
+	"gruvbox, gruvbox-light, catppuccin-mocha, catppuccin-latte"
+
+func TestNamedThemes(t *testing.T) {
+	doc := "# Title\n\n" + goBlock
+	const (
+		defaultHeading = "\x1b[1m# Title"
+		draculaHeading = "\x1b[1;38;2;189;147;249m# Title"
+		nordHeading    = "\x1b[1;38;2;136;192;208m# Title"
+	)
+	render := func(env string, args ...string) (*fake, int) {
+		f := &fake{stdin: doc, stdoutTTY: true, width: 80, height: 100, colorterm: "truecolor", lightOK: true, termdTheme: env}
+		return f, f.run(args...)
+	}
+	tests := []struct {
+		name    string
+		env     string
+		args    []string
+		calls   int
+		heading string
+	}{
+		{"named theme", "", []string{"--theme=dracula"}, 0, draculaHeading},
+		{"theme from the environment", "nord", nil, 0, nordHeading},
+		{"flag over the environment", "nord", []string{"--theme=light"}, 0, defaultHeading},
+		{"explicit auto over the environment", "nord", []string{"--theme=auto"}, 1, defaultHeading},
+		{"empty variable", "", nil, 1, defaultHeading},
+		{"invalid variable with a flag", "drakula", []string{"--theme=dark"}, 0, defaultHeading},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, code := render(tt.env, tt.args...)
+			if code != 0 {
+				t.Fatalf("exit %d, stderr %q", code, f.stderr.String())
+			}
+			if f.detectCalls != tt.calls {
+				t.Errorf("terminal queried %d times, want %d", f.detectCalls, tt.calls)
+			}
+			if out := f.stdout.String(); !strings.HasPrefix(out, tt.heading) {
+				t.Errorf("output starts with %q, want %q", out[:min(len(out), 40)], tt.heading)
+			}
+		})
+	}
+	t.Run("flag over the environment gives the output of the flag", func(t *testing.T) {
+		withEnv, _ := render("nord", "--theme=light")
+		withoutEnv, _ := render("", "--theme=light")
+		if withEnv.stdout.String() != withoutEnv.stdout.String() {
+			t.Error("TERMD_THEME changes the output of --theme=light")
+		}
+	})
+}
+
+func TestInvalidThemeMessages(t *testing.T) {
+	t.Run("variable", func(t *testing.T) {
+		f := &fake{stdin: "# x\n", termdTheme: "drakula"}
+		if code := f.run(); code != 2 {
+			t.Errorf("exit %d, want 2", code)
+		}
+		if f.stdout.Len() != 0 {
+			t.Errorf("stdout %q, want nothing", f.stdout.String())
+		}
+		if want := `TERMD_THEME must be one of ` + wantThemeValues + `, got "drakula"`; !strings.Contains(f.stderr.String(), want) {
+			t.Errorf("stderr %q does not contain %q", f.stderr.String(), want)
+		}
+	})
+	t.Run("flag", func(t *testing.T) {
+		f := &fake{stdin: "# x\n"}
+		if code := f.run("--theme=blue"); code != 2 {
+			t.Errorf("exit %d, want 2", code)
+		}
+		if want := `--theme must be one of ` + wantThemeValues + `, got "blue"`; !strings.Contains(f.stderr.String(), want) {
+			t.Errorf("stderr %q does not contain %q", f.stderr.String(), want)
+		}
+	})
+	t.Run("help", func(t *testing.T) {
+		f := &fake{}
+		if code := f.run("--help"); code != 0 {
+			t.Errorf("exit %d, want 0", code)
+		}
+		if want := "color theme: " + wantThemeValues; !strings.Contains(f.stderr.String(), want) {
+			t.Errorf("help %q does not contain %q", f.stderr.String(), want)
+		}
+	})
 }
 
 func TestColorDepth(t *testing.T) {

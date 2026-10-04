@@ -23,6 +23,7 @@ import (
 	"github.com/ekalinin/termd/internal/render"
 	"github.com/ekalinin/termd/internal/style"
 	"github.com/ekalinin/termd/internal/termbg"
+	"github.com/ekalinin/termd/internal/theme"
 )
 
 const usage = `Usage: termd [flags] [FILE | DIR]
@@ -106,7 +107,7 @@ func run(args []string, e env) int {
 	width := fs.Int("width", 0, "output width in columns (default: terminal width, or 80 when not a terminal)")
 	noPager := fs.Bool("no-pager", false, "print directly instead of paging through less")
 	hyperlinks := fs.String("hyperlinks", "auto", "terminal hyperlinks: auto, always or never")
-	theme := fs.String("theme", "auto", "code highlighting theme: auto, dark or light")
+	themeFlag := fs.String("theme", "auto", "color theme: "+themeValues())
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = func() {
 		fmt.Fprint(e.stderr, usage)
@@ -128,16 +129,24 @@ func run(args []string, e env) int {
 		return 2
 	}
 
-	widthSet := false
-	fs.Visit(func(f *flag.Flag) { widthSet = widthSet || f.Name == "width" })
+	widthSet, themeSet := false, false
+	fs.Visit(func(f *flag.Flag) {
+		widthSet = widthSet || f.Name == "width"
+		themeSet = themeSet || f.Name == "theme"
+	})
 	if widthSet && *width <= 0 {
 		return usageError("--width must be a positive number, got %d", *width)
 	}
 	if !slices.Contains([]string{"auto", "always", "never"}, *hyperlinks) {
 		return usageError("--hyperlinks must be auto, always or never, got %q", *hyperlinks)
 	}
-	if !slices.Contains([]string{"auto", "dark", "light"}, *theme) {
-		return usageError("--theme must be auto, dark or light, got %q", *theme)
+	// A given --theme wins over TERMD_THEME; only the value used is checked.
+	themeName, themeSource := *themeFlag, "--theme"
+	if v := e.getenv("TERMD_THEME"); !themeSet && v != "" {
+		themeName, themeSource = v, "TERMD_THEME"
+	}
+	if _, ok := theme.Get(themeName); !ok && themeName != "auto" {
+		return usageError("%s must be one of %s, got %q", themeSource, themeValues(), themeName)
 	}
 	if fs.NArg() > 1 {
 		return usageError("expected at most one file, got %d", fs.NArg())
@@ -173,8 +182,9 @@ func run(args []string, e env) int {
 			Hyperlinks: *hyperlinks == "always" || (*hyperlinks == "auto" && e.stdoutTTY),
 			Depth:      colorDepth(e.getenv("COLORTERM")),
 		},
-		Theme: themeFunc(*theme, e.detectLight),
-		Dir:   docDir(file),
+		Theme:   themeFunc(themeName, e.detectLight),
+		Palette: themePalette(themeName),
+		Dir:     docDir(file),
 	}
 	// A file whose name the highlighter recognizes is shown as code; stdin is
 	// always markdown.
@@ -258,14 +268,16 @@ func colorDepth(colorterm string) style.Depth {
 	return style.Color256
 }
 
-// themeFunc returns the lazy theme resolver for the --theme flag. Only
-// "auto" queries the terminal, and only when the renderer asks.
-func themeFunc(flagTheme string, detectLight func() (bool, bool)) func() highlight.Theme {
-	switch flagTheme {
-	case "dark":
-		return func() highlight.Theme { return highlight.Dark }
-	case "light":
-		return func() highlight.Theme { return highlight.Light }
+// themeValues lists the values of --theme: auto and the theme names.
+func themeValues() string {
+	return strings.Join(append([]string{"auto"}, theme.Names()...), ", ")
+}
+
+// themeFunc returns the lazy highlighting theme resolver for a theme name or
+// "auto". Only "auto" queries the terminal, and only when the renderer asks.
+func themeFunc(name string, detectLight func() (bool, bool)) func() highlight.Theme {
+	if t, ok := theme.Get(name); ok {
+		return func() highlight.Theme { return t.Code }
 	}
 	return func() highlight.Theme {
 		if light, ok := detectLight(); ok && light {
@@ -273,6 +285,15 @@ func themeFunc(flagTheme string, detectLight func() (bool, bool)) func() highlig
 		}
 		return highlight.Dark
 	}
+}
+
+// themePalette returns the palette for a theme name or "auto". dark and light
+// share theme.Default, so "auto" needs no query to choose it.
+func themePalette(name string) theme.Palette {
+	if t, ok := theme.Get(name); ok {
+		return t.Palette
+	}
+	return theme.Default
 }
 
 // pagerPath decides whether to page the output and returns the pager path.

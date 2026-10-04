@@ -296,19 +296,13 @@ func NaturalWidth(spans []Span) int {
 	return widest
 }
 
-// linkStyle marks link text when styling is enabled.
-var linkStyle = style.Style{Underline: true, ANSI: 34}
-
 // LinkSpans turns the label of a link into spans. With hyperlinks the label
 // carries the destination as an OSC 8 link; without them the destination is
-// appended as " (url)", unless the label already reads as the URL.
+// appended as " (url)", unless the label already reads as the URL. The
+// spans of the label keep their styles.
 func LinkSpans(label []Span, url string, hyperlinks bool) []Span {
 	out := make([]Span, 0, len(label)+1)
 	for _, sp := range label {
-		if sp.Style.ANSI == 0 && !sp.Style.FG.Set {
-			sp.Style.ANSI = linkStyle.ANSI
-		}
-		sp.Style.Underline = true
 		if hyperlinks {
 			sp.Link = url
 		}

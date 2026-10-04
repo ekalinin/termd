@@ -10,6 +10,7 @@ import (
 	"github.com/ekalinin/termd/internal/golden"
 	"github.com/ekalinin/termd/internal/highlight"
 	"github.com/ekalinin/termd/internal/style"
+	"github.com/ekalinin/termd/internal/theme"
 )
 
 const fixtures = "../../testdata"
@@ -73,6 +74,25 @@ func TestCodeFileGolden(t *testing.T) {
 				t.Errorf("styled output without escapes differs from the file\n%s", got)
 			}
 			golden.Assert(t, filepath.Join(fixtures, "golden", name+".styled.golden"), got)
+		})
+	}
+}
+
+// TestThemeGolden renders testdata/themes/sample.md at width 60 with every
+// built-in theme and compares the output with
+// testdata/golden/theme.<name>.golden.
+func TestThemeGolden(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(fixtures, "themes", "sample.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range theme.Names() {
+		t.Run(name, func(t *testing.T) {
+			th, _ := theme.Get(name)
+			opts := goldenOptions(60, true)
+			opts.Palette = th.Palette
+			opts.Theme = func() highlight.Theme { return th.Code }
+			golden.Assert(t, filepath.Join(fixtures, "golden", "theme."+name+".golden"), Render(src, opts))
 		})
 	}
 }

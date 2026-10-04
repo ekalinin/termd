@@ -11,22 +11,36 @@ import (
 	"github.com/ekalinin/termd/internal/text"
 )
 
-// Theme selects the color set used for highlighting.
-type Theme int
+// Theme selects the color set used for highlighting: the name of a chroma
+// style.
+type Theme string
 
 const (
 	// Dark suits terminals with a dark background.
-	Dark Theme = iota
+	Dark Theme = "github-dark"
 	// Light suits terminals with a light background.
-	Light
+	Light Theme = "github"
 )
 
 // styleName returns the chroma style used for the theme.
 func (t Theme) styleName() string {
-	if t == Light {
-		return "github"
+	return string(t)
+}
+
+// Colors returns the text and the background color of the theme's chroma
+// style, the colors of a terminal the style is made for. A color the style
+// does not define is not set.
+func (t Theme) Colors() (fg, bg style.Color) {
+	e := styles.Get(t.styleName()).Get(chroma.Text)
+	return rgb(e.Colour), rgb(e.Background)
+}
+
+// rgb converts a chroma color; an unset one gives the zero Color.
+func rgb(c chroma.Colour) style.Color {
+	if !c.IsSet() {
+		return style.Color{}
 	}
-	return "github-dark"
+	return style.RGB(c.Red(), c.Green(), c.Blue())
 }
 
 // Language returns the lower-cased first word of a code block info string.

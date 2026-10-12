@@ -1,0 +1,63 @@
+# Definition lists
+
+A definition list is a paragraph followed by lines that start with a colon and a space.
+
+## One entry
+
+termd
+: A terminal markdown viewer.
+
+## Two terms, two definitions
+
+Colour
+Color
+: The visual property of an object.
+: A palette entry of a theme.
+
+## Several entries
+
+`--width`
+: Output width in columns, with *emphasis* and a [link](https://example.com/docs).
+
+`--theme`
+: Color theme.
+
+## Loose list
+
+Tight
+: No blank line before this definition.
+
+Loose
+
+: A blank line before this definition makes the whole list loose.
+
+## Several blocks
+
+Install
+: Build the binary from source.
+
+    The second paragraph and a code block belong to the same definition:
+
+    ```sh
+    make build
+    ```
+
+## Long definition
+
+Wrapping
+: This definition is long enough to wrap at every width of the golden files, and its wrapped lines start four columns to the right of the term.
+
+## In containers
+
+- A list item with a definition list:
+
+  Term
+  : Definition inside a list item.
+
+> Term
+> : Definition inside a block quote.
+
+## Not a definition
+
+Term
+:not a definition, because the colon has no space after it.

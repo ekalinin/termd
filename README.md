@@ -144,6 +144,21 @@ When the document is read from a file, relative destinations of links and images
 
 A footnote reference is shown as `[1]`. Footnotes are numbered in the order of their first reference, not by their labels. The definitions are shown at the end of the document, after a horizontal line, as a numbered list in the order of their numbers; a definition with several paragraphs is laid out like a list item. A definition that is never referenced is not shown. The reference is not a hyperlink, because a terminal hyperlink cannot jump to another place of the output, and there are no back-references from a definition to its reference.
 
+### Definition lists
+
+A paragraph followed by lines that start with a colon and a space is a definition list, as in PHP Markdown Extra:
+
+```markdown
+Term
+: Definition of the term.
+```
+
+Every line of the paragraph is a term of its own, so two lines followed by one definition give two terms that share it. A term can have several definitions, each starting with its own `: ` line, and indented lines after a definition continue it, including further paragraphs and code blocks. A line that starts with `:` without a space after it, such as `:not`, stays text.
+
+Each term is shown on its own line, in bold in a terminal, and its definitions follow it indented by 4 columns, with wrapped lines and further blocks indented the same way. No theme colors a term; inline code and links in it keep their colors. The list has no blank lines, unless a definition has a blank line before it in the source or consists of more than one block: then a blank line separates the definitions from each other and from the term that follows them.
+
+GitHub does not support definition lists and renders such text as one paragraph, `Term : Definition of the term.`
+
 ### Themes
 
 A theme sets the colors of the whole document. `--theme` selects it; without the flag, the `TERMD_THEME` environment variable does, and without both termd uses `auto`. A `--theme` on the command line, `--theme=auto` included, wins over the variable, and the variable is then not checked. An unknown name in the value that is used is a usage error with exit status 2, also when the output goes to a pipe; the message names the flag or the variable and lists the valid values, which `termd --help` lists too.

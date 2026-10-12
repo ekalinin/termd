@@ -44,9 +44,10 @@ type Block struct {
 	Wide  bool
 }
 
-// Parse parses src as CommonMark with the GFM extensions and footnotes.
+// Parse parses src as CommonMark with the GFM extensions, footnotes and
+// definition lists.
 func Parse(src []byte) ast.Node {
-	md := goldmark.New(goldmark.WithExtensions(extension.GFM, extension.Footnote))
+	md := goldmark.New(goldmark.WithExtensions(extension.GFM, extension.Footnote, extension.DefinitionList))
 	return md.Parser().Parse(gtext.NewReader(src))
 }
 
@@ -179,6 +180,8 @@ func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 		return r.table(n, width), true
 	case *east.FootnoteList:
 		return r.footnotes(n, width), true
+	case *east.DefinitionList:
+		return r.definitions(n, width), true
 	}
 	if n.HasChildren() {
 		blocks := r.blocks(n, width)
@@ -422,6 +425,42 @@ func (r *renderer) footnotes(n *east.FootnoteList, width int) Block {
 	}
 	list := r.items(n, markers, tight, width)
 	return Block{Lines: join([]Block{rule(width, r.pal.Marker), list}, true), Wide: list.Wide}
+}
+
+// definitions renders a definition list: every term on its own line in bold,
+// the definitions below their terms indented by 4 columns. Like a markdown
+// list, the list is loose when a definition has a blank line before it or
+// more than one block; then a blank line separates the definitions from each
+// other and from a term that follows them.
+func (r *renderer) definitions(n *east.DefinitionList, width int) Block {
+	const indent = 4
+	loose := false
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		if d, ok := c.(*east.DefinitionDescription); ok && (!d.IsTight || d.ChildCount() > 1) {
+			loose = true
+		}
+	}
+
+	var b Block
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		if _, ok := c.PreviousSibling().(*east.DefinitionDescription); ok && loose {
+			b.Lines = append(b.Lines, text.Line{})
+		}
+		switch c := c.(type) {
+		case *east.DefinitionTerm:
+			b.Lines = append(b.Lines, text.Wrap(r.inlines(c, style.Style{Bold: true}), width, true)...)
+		case *east.DefinitionDescription:
+			children := r.blocks(c, width-indent)
+			b.Wide = b.Wide || anyWide(children)
+			for _, l := range join(children, true) {
+				if len(l) > 0 {
+					l = l.Prepend(text.Span{Text: strings.Repeat(" ", indent)})
+				}
+				b.Lines = append(b.Lines, l)
+			}
+		}
+	}
+	return b
 }
 
 // inlines renders the inline children of n on top of the base style st.

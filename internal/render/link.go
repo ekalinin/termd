@@ -30,14 +30,29 @@ func (r *renderer) destination(dest []byte) string {
 	return resolveLink(string(dest), r.opts.Dir, localHost())
 }
 
+// htmlDestination returns the URL of an href or src attribute, which the
+// tokenizer has already decoded, under the rules of destination.
+func (r *renderer) htmlDestination(v string) string {
+	if !r.opts.Style.Hyperlinks || r.opts.Dir == "" {
+		return v
+	}
+	return resolveDecoded(v, v, r.opts.Dir, localHost())
+}
+
 // resolveLink returns the URL of the link destination dest of a document in
 // the directory dir: a relative path becomes a file URL on host, anything
 // else (a scheme, a fragment only, a leading slash) is returned as written.
 func resolveLink(dest, dir, host string) string {
+	return resolveDecoded(dest, string(unescape([]byte(dest))), dir, host)
+}
+
+// resolveDecoded is resolveLink for a destination written as dest, whose
+// escapes and character references decode to decoded.
+func resolveDecoded(dest, decoded, dir, host string) string {
 	if dir == "" || strings.HasPrefix(dest, "/") {
 		return dest
 	}
-	u, err := url.Parse(string(unescape([]byte(dest))))
+	u, err := url.Parse(decoded)
 	if err != nil || u.Scheme != "" || u.Path == "" {
 		return dest
 	}

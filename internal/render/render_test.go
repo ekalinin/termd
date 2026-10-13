@@ -10,6 +10,7 @@ import (
 
 	"github.com/yuin/goldmark/ast"
 	east "github.com/yuin/goldmark/extension/ast"
+	"golang.org/x/net/html"
 
 	"github.com/ekalinin/termd/internal/highlight"
 	"github.com/ekalinin/termd/internal/style"
@@ -246,9 +247,258 @@ func TestImagesAndHTML(t *testing.T) {
 	if !strings.Contains(got, "[image: architecture] (docs/arch.png)") {
 		t.Errorf("image not rendered: %q", got)
 	}
-	if !strings.Contains(got, "<details><summary>More</summary>text</details>") {
-		t.Errorf("raw HTML not kept: %q", got)
+	if !strings.HasSuffix(got, "\n▾ More\n  text\n") {
+		t.Errorf("raw HTML not interpreted: %q", got)
 	}
+	opts := plain(80)
+	opts.HTMLSource = true
+	if got := Render([]byte("<details><summary>More</summary>text</details>\n"), opts); got != "<details><summary>More</summary>text</details>\n" {
+		t.Errorf("raw HTML not kept as source: %q", got)
+	}
+}
+
+func TestImageWithoutAlt(t *testing.T) {
+	got := renderLines("![](logo.png) ![ ](icon.png) ![architecture](docs/arch.png)\n", plain(80))
+	want := "[image] (logo.png) [image] (icon.png) [image: architecture] (docs/arch.png)"
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestHTMLTokens(t *testing.T) {
+	// tok writes a token as type:data, with the attributes of a tag.
+	tok := func(t html.Token) string {
+		s := t.Type.String() + ":" + t.Data
+		for _, a := range t.Attr {
+			s += " " + a.Key + "=" + a.Val
+		}
+		return s
+	}
+	tests := []struct {
+		src  string
+		want []string
+	}{
+		{`<a href="x&amp;y">A &lt;b&gt; &#27;</a>`, []string{"StartTag:a href=x&y", "Text:A <b> ␛", "EndTag:a"}},
+		{`<img alt="&#7;" src=y>`, []string{"StartTag:img alt=␇ src=y"}},
+		{"ok <b>x</b> <broken <p", []string{"Text:ok ", "StartTag:b", "Text:x", "EndTag:b", "Text: ", "Text:<broken <p"}},
+		{`<p align="center`, []string{`Text:<p align="center`}},
+		{"a < b", []string{"Text:a < b"}},
+	}
+	for _, tt := range tests {
+		var got []string
+		for _, t := range htmlTokens(tt.src) {
+			got = append(got, tok(t))
+		}
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("htmlTokens(%q) = %q, want %q", tt.src, got, tt.want)
+		}
+	}
+}
+
+func TestInlineHTML(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"line break", "one<br>two\n", []string{"one", "two"}},
+		{"link", "See <a href=\"https://example.com\">the *guide*</a>.\n", []string{"See the guide (https://example.com)."}},
+		{"link without href", "An <a name=\"x\">anchor</a>.\n", []string{"An anchor."}},
+		{"formatting tags", "Press <kbd>Ctrl</kbd>+<kbd>C</kbd>, <b>bold</b> and <em>italic</em>\n", []string{"Press Ctrl+C, bold and italic"}},
+		{"removed tags", "x<sup>2</sup> <span class=\"note\">text</span>\n", []string{"x2 text"}},
+		{"unknown tag in text", "Connect with ssh user@<host>.\n", []string{"Connect with ssh user@."}},
+		{"unclosed and stray tags", "<b>bold\n\nnext</b> text\n", []string{"bold", "", "next text"}},
+		{"block tags break the line", "one <div>two</div> three\n", []string{"one", "two", "three"}},
+		{"comment", "a <!-- note --> b\n", []string{"a b"}},
+		{"image", "<img src=\"logo.png\" alt=\"logo\"> and <img src=\"x.png\">\n", []string{"[image: logo] (logo.png) and [image] (x.png)"}},
+		{"table cell", "| a | b |\n|---|---|\n| one<br>two | x |\n", []string{"a   │ b", "────┼──", "one │ x", "two │"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := renderLines(tt.src, plain(80))
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
+			}
+		})
+	}
+	t.Run("source", func(t *testing.T) {
+		opts := plain(80)
+		opts.HTMLSource = true
+		if got := renderLines("Press <kbd>Ctrl</kbd>.\n", opts); len(got) != 1 || got[0] != "Press <kbd>Ctrl</kbd>." {
+			t.Errorf("got %q", got)
+		}
+	})
+}
+
+func TestInlineHTMLStyles(t *testing.T) {
+	same := []struct{ html, md string }{
+		{"<kbd>Ctrl</kbd>\n", "`Ctrl`\n"},
+		{"<code>x</code>\n", "`x`\n"},
+		{"<b>bold</b> <strong>strong</strong>\n", "**bold** **strong**\n"},
+		{"<i>italic</i> <em>em</em>\n", "*italic* *em*\n"},
+		{"<a href=\"https://example.com\">docs</a>\n", "[docs](https://example.com)\n"},
+		{"<a href=\"https://example.com\"><img src=\"x.png\" alt=\"x\"></a>\n", "[![x](x.png)](https://example.com)\n"},
+	}
+	for _, tt := range same {
+		if got, want := Render([]byte(tt.html), styled(80)), Render([]byte(tt.md), styled(80)); got != want {
+			t.Errorf("%q = %q, want %q as for %q", tt.html, got, want, tt.md)
+		}
+	}
+	t.Run("unclosed tag", func(t *testing.T) {
+		got := renderLines("<b>bold\n\nnext</b> text\n", styled(80))
+		want := []string{sgr("1") + "bold" + style.Reset, "", "next text"}
+		if !slices.Equal(got, want) {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+	t.Run("control characters in a destination", func(t *testing.T) {
+		opts := Options{Width: 80, Style: style.Options{Hyperlinks: true}}
+		got := Render([]byte("<a href=\"https://example.com/&#27;]0;pwned&#7;\">docs</a>\n"), opts)
+		if want := "\x1b]8;;https://example.com/␛]0;pwned␇\x1b\\docs\x1b]8;;\x1b\\\n"; got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+}
+
+func TestHTMLBlocks(t *testing.T) {
+	badges := "<p align=\"center\">\n" +
+		"<a href=\"https://ci.example.com\"><img src=\"https://ci.example.com/badge.svg\" alt=\"CI\"></a>\n" +
+		"<a href=\"https://pkg.go.dev/x\"><img src=\"https://pkg.go.dev/badge/x.svg\"></a>\n" +
+		"</p>\n"
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"centered logo", "<p align=\"center\">\n  <img src=\"logo.png\" alt=\"termd\" width=\"200\">\n</p>\n", []string{"[image: termd] (logo.png)"}},
+		{"image without alt", "<img src=\"logo.png\">\n", []string{"[image] (logo.png)"}},
+		{"linked images in a pipe", badges, []string{
+			"[image: CI] (https://ci.example.com/badge.svg) (https://ci.example.com) [image]",
+			"(https://pkg.go.dev/badge/x.svg) (https://pkg.go.dev/x)",
+		}},
+		{
+			"header of a README",
+			"<p align=\"center\"><img src=\"logo.png\" alt=\"logo\"></p>\n<h1 align=\"center\">termd</h1>\n<p align=\"center\">Markdown in the terminal</p>\n",
+			[]string{"[image: logo] (logo.png)", "", "# termd", "", "Markdown in the terminal"},
+		},
+		{"heading level", "<h3>Usage</h3>\n", []string{"### Usage"}},
+		{"paragraphs", "<div>one</div><div>two</div>\n", []string{"one", "", "two"}},
+		{"text after a tag line", "<img src=\"a.png\">\ntext after\n", []string{"[image] (a.png) text after"}},
+		{
+			"script, style and comments",
+			"A\n\n<!-- note -->\n\n<script>alert(1)</script>\n\n<style>p {}</style>\n\nB\n",
+			[]string{"A", "", "B"},
+		},
+		{"character references", "<p>A &amp; B &lt;C&gt;</p>\n", []string{"A & B <C>"}},
+		{"markdown in an HTML block", "<div>**bold**</div>\n", []string{"**bold**"}},
+		{"broken HTML", "<p align=\"center\n", []string{"<p align=\"center"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := renderLines(tt.src, plain(80))
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
+			}
+		})
+	}
+	t.Run("row of badges", func(t *testing.T) {
+		out := Render([]byte(badges), Options{Width: 80, Style: style.Options{Hyperlinks: true}})
+		if got := stripEscapes(out); got != "[image: CI] [image]\n" {
+			t.Errorf("visible output %q", got)
+		}
+		for _, want := range []string{
+			"\x1b]8;;https://ci.example.com\x1b\\[image: CI]\x1b]8;;\x1b\\",
+			"\x1b]8;;https://pkg.go.dev/x\x1b\\[image]\x1b]8;;\x1b\\",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output %q lacks %q", out, want)
+			}
+		}
+	})
+	t.Run("relative image in a file", func(t *testing.T) {
+		host, _ := os.Hostname()
+		opts := Options{Width: 80, Style: style.Options{Hyperlinks: true}, Dir: "/home/u/proj"}
+		out := Render([]byte("<img src=\"img/arch.png\" alt=\"arch\">\n"), opts)
+		if want := "\x1b]8;;file://" + host + "/home/u/proj/img/arch.png\x1b\\[image: arch]"; !strings.Contains(out, want) {
+			t.Errorf("output %q lacks %q", out, want)
+		}
+	})
+	t.Run("source", func(t *testing.T) {
+		opts := plain(80)
+		opts.HTMLSource = true
+		src := "<p align=\"center\">\n  <img src=\"logo.png\" alt=\"termd\" width=\"200\">\n</p>\n"
+		if got := Render([]byte(src), opts); got != src {
+			t.Errorf("got %q, want %q", got, src)
+		}
+	})
+}
+
+func TestDetails(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			"around markdown blocks",
+			"<details>\n<summary>Install</summary>\n\nRun **this**:\n\n```sh\ngo install x\n```\n\n</details>\n\nAfter.\n",
+			[]string{"▾ Install", "  Run this:", "", "  go install x", "", "After."},
+		},
+		{"in one block", "<details><summary>More</summary>text</details>\n", []string{"▾ More", "  text"}},
+		{"without summary", "<details>text</details>\n", []string{"▾ Details", "  text"}},
+		{"without content", "<details><summary>More</summary></details>\n", []string{"▾ More"}},
+		{
+			"nested",
+			"<details><summary>A</summary>\n\n<details><summary>B</summary>\n\ntext\n\n</details>\n\n</details>\n",
+			[]string{"▾ A", "  ▾ B", "    text"},
+		},
+		{
+			"not closed in a block quote",
+			"> <details><summary>S</summary>\n>\n> text\n\nAfter.\n",
+			[]string{"│ ▾ S", "│   text", "", "After."},
+		},
+		{
+			"in a list item",
+			"- item\n\n  <details><summary>S</summary>\n\n  text\n\n  </details>\n- next\n",
+			[]string{"• item", "", "  ▾ S", "    text", "", "• next"},
+		},
+		{"stray end tag", "</details>\n\ntext\n", []string{"text"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := renderLines(tt.src, plain(40))
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
+			}
+		})
+	}
+	t.Run("long content", func(t *testing.T) {
+		got := renderLines("<details><summary>"+strings.Repeat("title ", 10)+"</summary>\n\n"+strings.Repeat("word ", 20)+"\n\n</details>\n", plain(40))
+		if len(got) < 4 || !strings.HasPrefix(got[0], "▾ title") || !strings.HasPrefix(got[1], "  title") {
+			t.Fatalf("summary did not wrap: %q", got)
+		}
+		for _, l := range got[1:] {
+			if !strings.HasPrefix(l, "  ") || text.Width(l) > 40 {
+				t.Errorf("line %q", l)
+			}
+		}
+	})
+	t.Run("source", func(t *testing.T) {
+		opts := plain(40)
+		opts.HTMLSource = true
+		src := "<details>\n<summary>Install</summary>\n\ntext\n\n</details>\n"
+		if got := Render([]byte(src), opts); got != src {
+			t.Errorf("got %q, want %q", got, src)
+		}
+	})
+	t.Run("marker style", func(t *testing.T) {
+		opts := themed(t, "dracula")
+		got := renderLines("<details><summary>More</summary>text</details>\n", opts)
+		want := text.Line{{Text: "▾ ", Style: opts.Palette.Marker}, {Text: "More"}}.Render(opts.Style)
+		if len(got) != 2 || got[0] != want {
+			t.Errorf("got %q, want %q first", got, want)
+		}
+	})
 }
 
 func TestWideBlockIsNotTruncated(t *testing.T) {
@@ -589,6 +839,7 @@ func column(line, sep string) int {
 
 func TestControlCharacters(t *testing.T) {
 	linksOnly := Options{Width: 80, Style: style.Options{Hyperlinks: true}}
+	source := Options{Width: 80, HTMLSource: true}
 	tests := []struct {
 		name string
 		src  string
@@ -603,8 +854,10 @@ func TestControlCharacters(t *testing.T) {
 		{"link with hyperlinks", "[docs](https://example.com/\x1b]0;pwned\x07)\n", linksOnly, "\x1b]8;;https://example.com/␛]0;pwned␇\x1b\\docs\x1b]8;;\x1b\\\n"},
 		{"link in a pipe", "[docs](https://example.com/\x1b]0;pwned\x07)\n", plain(80), "docs (https://example.com/␛]0;pwned␇)\n"},
 		{"image", "![alt\x1b\x07](x.png)\n", plain(80), "[image: alt␛␇] (x.png)\n"},
-		{"inline html", "<span>\x1b[31m</span>\n", plain(80), "<span>␛[31m</span>\n"},
-		{"html block", "<div>\n\x1b[31m\n</div>\n", plain(80), "<div>\n␛[31m\n</div>\n"},
+		{"inline html", "<span>\x1b[31m</span>\n", plain(80), "␛[31m\n"},
+		{"inline html as source", "<span>\x1b[31m</span>\n", source, "<span>␛[31m</span>\n"},
+		{"html block", "<div>\n\x1b[31m\n</div>\n", plain(80), "␛[31m\n"},
+		{"html block as source", "<div>\n\x1b[31m\n</div>\n", source, "<div>\n␛[31m\n</div>\n"},
 		{"frontmatter value", "---\nraw: a\x1bb\n---\n", plain(80), "raw │ a␛b\n"},
 	}
 	for _, tt := range tests {

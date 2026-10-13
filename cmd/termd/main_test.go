@@ -385,6 +385,37 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestHTMLMode(t *testing.T) {
+	for _, tt := range []struct {
+		args []string
+		want string
+	}{
+		{nil, "Press Ctrl.\n"},
+		{[]string{"--html=render"}, "Press Ctrl.\n"},
+		{[]string{"--html=source"}, "Press <kbd>Ctrl</kbd>.\n"},
+	} {
+		f := &fake{stdin: "Press <kbd>Ctrl</kbd>.\n"}
+		if code := f.run(tt.args...); code != 0 {
+			t.Fatalf("%v: exit %d", tt.args, code)
+		}
+		if got := f.stdout.String(); got != tt.want {
+			t.Errorf("%v: got %q, want %q", tt.args, got, tt.want)
+		}
+	}
+	t.Run("invalid", func(t *testing.T) {
+		f := &fake{stdin: "# x\n"}
+		if code := f.run("--html=strip"); code != 2 {
+			t.Errorf("exit %d, want 2", code)
+		}
+		if want := `--html must be render or source, got "strip"`; !strings.Contains(f.stderr.String(), want) {
+			t.Errorf("stderr %q does not contain %q", f.stderr.String(), want)
+		}
+		if !strings.Contains(f.stderr.String(), "Usage: termd") {
+			t.Errorf("no usage on stderr: %q", f.stderr.String())
+		}
+	})
+}
+
 func TestPipeOutput(t *testing.T) {
 	f := &fake{stdin: "**bold** [link](https://example.com)\n\n" + longParagraph + "\n```go\nfunc main() {}\n```\n"}
 	if code := f.run(); code != 0 {

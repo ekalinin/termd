@@ -108,6 +108,7 @@ func run(args []string, e env) int {
 	noPager := fs.Bool("no-pager", false, "print directly instead of paging through less")
 	hyperlinks := fs.String("hyperlinks", "auto", "terminal hyperlinks: auto, always or never")
 	themeFlag := fs.String("theme", "auto", "color theme: "+themeValues())
+	htmlMode := fs.String("html", "render", "HTML in the document: render or source")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = func() {
 		fmt.Fprint(e.stderr, usage)
@@ -139,6 +140,9 @@ func run(args []string, e env) int {
 	}
 	if !slices.Contains([]string{"auto", "always", "never"}, *hyperlinks) {
 		return usageError("--hyperlinks must be auto, always or never, got %q", *hyperlinks)
+	}
+	if !slices.Contains([]string{"render", "source"}, *htmlMode) {
+		return usageError("--html must be render or source, got %q", *htmlMode)
 	}
 	// A given --theme wins over TERMD_THEME; only the value used is checked.
 	themeName, themeSource := *themeFlag, "--theme"
@@ -182,9 +186,10 @@ func run(args []string, e env) int {
 			Hyperlinks: *hyperlinks == "always" || (*hyperlinks == "auto" && e.stdoutTTY),
 			Depth:      colorDepth(e.getenv("COLORTERM")),
 		},
-		Theme:   themeFunc(themeName, e.detectLight),
-		Palette: themePalette(themeName),
-		Dir:     docDir(file),
+		Theme:      themeFunc(themeName, e.detectLight),
+		Palette:    themePalette(themeName),
+		Dir:        docDir(file),
+		HTMLSource: *htmlMode == "source",
 	}
 	// A file whose name the highlighter recognizes is shown as code; stdin is
 	// always markdown.

@@ -1,0 +1,43 @@
+[image: termd logo] (docs/logo.png)
+
+# termd
+
+[image: CI]
+(https://github.com/ekalinin/termd/actions/workflows/ci.yml/badge.svg)
+(https://github.com/ekalinin/termd/actions) [image]
+(https://pkg.go.dev/badge/github.com/ekalinin/termd.svg)
+(https://pkg.go.dev/github.com/ekalinin/termd) [image: License: MIT]
+(https://img.shields.io/badge/license-MIT-blue.svg) (LICENSE)
+
+Markdown in the terminal.
+Tables, diagrams and links.
+
+[image: Demo] (docs/demo.gif)
+
+## Usage
+
+Press Ctrl+C to quit. See the guide (docs/guide.md) for details, and connect
+with ssh user@.
+
+E = mc2, H2O, bold, italic and code.
+
+▾ Installation from source
+  Build it with Go:
+
+  go install github.com/ekalinin/termd/cmd/termd@latest
+
+  ▾ Nested
+    A nested details block with a paragraph that is long enough to wrap at every
+    width of the golden files.
+
+Key │ Description
+────┼────────────
+q   │ quit
+    │ the pager
+/   │ search
+
+▾ Sponsors
+  [image] (https://opencollective.com/x/sponsor/0/avatar.svg)
+  (https://opencollective.com/x/sponsor/0/website) [image]
+  (https://opencollective.com/x/sponsor/1/avatar.svg)
+  (https://opencollective.com/x/sponsor/1/website)

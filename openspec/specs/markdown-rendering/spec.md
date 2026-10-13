@@ -191,15 +191,23 @@ termd SHALL write a destination into the hyperlink as written in the document wh
 - **THEN** the hyperlink of `guide` is `file:///C:/proj/docs/guide.md`
 
 ### Requirement: Images and raw HTML
-termd SHALL render an image as its alt text in the form `[image: alt]`, linked to the image URL under the same rules as hyperlinks, and SHALL render raw HTML blocks and inline HTML as their source text.
+termd SHALL render an image as its alt text in the form `[image: alt]`, or as `[image]` when the alt text is empty or consists of whitespace only, linked to the image URL under the same rules as hyperlinks. termd SHALL render raw HTML blocks and inline HTML according to the HTML mode: in the mode `render`, the default, termd SHALL interpret their tags as described in "HTML tags"; in the mode `source`, termd SHALL render them as their source text.
 
 #### Scenario: Image
 - **WHEN** a document contains `![architecture](docs/arch.png)` and hyperlinks are disabled
 - **THEN** the output contains `[image: architecture] (docs/arch.png)`
 
+#### Scenario: Image without alt text
+- **WHEN** a document contains `![](logo.png)` and `![ ](icon.png)` and hyperlinks are disabled
+- **THEN** the output contains `[image] (logo.png)` and `[image] (icon.png)`
+
 #### Scenario: Raw HTML
-- **WHEN** a document contains `<details><summary>More</summary>text</details>`
-- **THEN** the HTML is output as source text
+- **WHEN** a document contains `<details><summary>More</summary>text</details>` and styling is disabled
+- **THEN** the output is `▾ More` followed by `  text`
+
+#### Scenario: Raw HTML as source
+- **WHEN** the same document is rendered with `--html=source`
+- **THEN** the HTML is output as source text, `<details><summary>More</summary>text</details>`
 
 ### Requirement: YAML frontmatter
 When the first line of a document is `---`, a later line is `---` or `...`, and the lines between them form a YAML mapping, termd SHALL NOT render these lines as markdown. termd SHALL render the mapping as the first block of the document: a table with two columns, the key and its value, with one row per key in source order, without a header row and without a horizontal rule. Keys SHALL be bold when styling is enabled. The table SHALL follow the table layout rules: column separators at the same columns on every line, words never split, the value column wrapping first, and a table that does not fit at its minimum widths emitted as a wide block. A UTF-8 byte order mark before the first line and CRLF line endings SHALL NOT prevent the detection.
@@ -347,8 +355,12 @@ In the scenarios, `\033` stands for ESC, `\007` for BEL, `\000` for NUL, `\177` 
 - **THEN** the output is `docs (https://example.com/␛]0;pwned␇)`
 
 #### Scenario: Image alt text and raw HTML
-- **WHEN** a document contains `![alt\033\007](x.png)` and `<span>\033[31m</span>`, and hyperlinks are disabled
-- **THEN** the output contains `[image: alt␛␇] (x.png)` and `<span>␛[31m</span>`
+- **WHEN** a document contains `![alt\033\007](x.png)`, `<span>\033[31m</span>` and `<span>&#27;[0m</span>`, and hyperlinks are disabled
+- **THEN** the output contains `[image: alt␛␇] (x.png)`, `␛[31m` and `␛[0m`, and with `--html=source` it contains `<span>␛[31m</span>`
+
+#### Scenario: HTML link destination with character references
+- **WHEN** a document contains `<a href="https://example.com/&#27;]0;pwned&#7;">docs</a>` and hyperlinks are enabled without styling
+- **THEN** the output is `\033]8;;https://example.com/␛]0;pwned␇\033\docs\033]8;;\033\`, with the visible text `docs`
 
 #### Scenario: Frontmatter values
 - **WHEN** the frontmatter contains `title: "\e]0;pwned\a"` with YAML escapes and `raw: a\033b`
@@ -469,3 +481,111 @@ When styling is disabled, the layout SHALL be the same, without bold.
 #### Scenario: Definition list in a list item
 - **WHEN** a list item `- item` contains, after a blank line, the indented lines `  Term` and `  : Def`
 - **THEN** `Term` starts at the column of the item text and `Def` starts 4 columns to the right of it
+
+### Requirement: HTML tags
+When the HTML mode is `render`, termd SHALL interpret the tags of HTML blocks and of inline HTML instead of showing their source:
+
+- `img` SHALL be rendered as an image with the value of `alt` as its alt text and the value of `src` as its destination.
+- `a` with an `href` SHALL be rendered as a link around its content to the value of `href`; the content of `a` without `href` SHALL be kept as text.
+- `p` and `div` SHALL start and end a paragraph; their attributes, such as `align`, SHALL be ignored.
+- `br` SHALL be a hard line break.
+- `h1` to `h6` SHALL be rendered as a heading of the same level.
+- `details` SHALL always show its content: the content of its `summary` on its own line after the marker `▾` and a space, and the rest of its content below it, indented by 2 columns. A `details` without `summary` SHALL show `Details` after the marker. The marker SHALL have the marker style of the theme, and the summary SHALL get no style of its own.
+- `kbd` and `code` SHALL be rendered in the inline code style, `b` and `strong` in bold, `i` and `em` in italic.
+- Every other tag, such as `span`, `picture`, `source`, `sup` or `sub`, SHALL be removed and its content kept. The content of `script` and `style` and HTML comments SHALL be removed.
+
+Images and links from HTML SHALL follow the rules of markdown images and links, including terminal hyperlinks, `text (url)` when hyperlinks are disabled and relative destinations resolved against the directory of the document file. Character references in text and in attribute values SHALL be decoded.
+
+The text of HTML SHALL be laid out like the text of a paragraph: whitespace, including the line breaks of the source, collapses into one space, and lines wrap at the output width. The paragraphs, headings and `details` of an HTML block SHALL be separated by blank lines like markdown blocks, and an HTML block without text SHALL give no output and no blank line. Markdown inside an HTML block SHALL NOT be parsed, as in CommonMark. The summary line of a `details` SHALL be followed by its content without a blank line; the blocks of the content SHALL be separated by blank lines, and a nested `details` SHALL be indented by 2 more columns.
+
+A start tag and its end tag can be in different parts of the document. A tag in a paragraph, a heading or a table cell SHALL apply to the content up to its end tag in the same paragraph, heading or table cell, and SHALL end with it when it is not closed there. A `details` SHALL contain the markdown blocks between the HTML block with its start tag and the HTML block with its end tag in the same container, such as the document, a list item or a block quote, and a `details` that is not closed SHALL end with its container. An end tag without a start tag SHALL be ignored. In a paragraph, a heading or a table cell, the tags `p`, `div`, `h1` to `h6`, `details` and `summary` SHALL break the line.
+
+Text that cannot be read as a tag, such as an unclosed `<p align="center`, SHALL be shown as text, and HTML SHALL never make the run fail. When styling is disabled, the layout SHALL be the same, without styles.
+
+#### Scenario: Centered logo
+- **WHEN** a document contains the lines `<p align="center">`, `  <img src="logo.png" alt="termd" width="200">` and `</p>`, and hyperlinks are disabled
+- **THEN** the output is `[image: termd] (logo.png)`
+
+#### Scenario: Image without alt
+- **WHEN** a document contains `<img src="logo.png">` and hyperlinks are disabled
+- **THEN** the output is `[image] (logo.png)`
+
+#### Scenario: Row of badges
+- **WHEN** a document contains the lines `<p align="center">`, `<a href="https://ci.example.com"><img src="https://ci.example.com/badge.svg" alt="CI"></a>`, `<a href="https://pkg.go.dev/x"><img src="https://pkg.go.dev/badge/x.svg"></a>` and `</p>`, and hyperlinks are enabled
+- **THEN** the visible output is `[image: CI] [image]` on one line, and the images open `https://ci.example.com` and `https://pkg.go.dev/x` when clicked
+
+#### Scenario: Linked image in a pipe
+- **WHEN** the same document is rendered with hyperlinks disabled
+- **THEN** the first image is shown as `[image: CI] (https://ci.example.com/badge.svg) (https://ci.example.com)`, as a markdown image inside a link
+
+#### Scenario: Header of a README
+- **WHEN** a document contains the lines `<p align="center"><img src="logo.png" alt="logo"></p>`, `<h1 align="center">termd</h1>` and `<p align="center">Markdown in the terminal</p>`, and styling and hyperlinks are disabled
+- **THEN** the output is `[image: logo] (logo.png)`, a blank line, `# termd`, a blank line and `Markdown in the terminal`
+
+#### Scenario: Line break
+- **WHEN** a paragraph contains `one<br>two`
+- **THEN** the output is `one` and `two` on two lines
+
+#### Scenario: Line break in a table cell
+- **WHEN** a table cell contains `one<br>two`
+- **THEN** the cell shows `one` and `two` on two lines and is measured as 3 columns
+
+#### Scenario: Details around markdown blocks
+- **WHEN** a document contains `<details>`, `<summary>Install</summary>`, a blank line, `Run **this**:`, a blank line, a fenced code block with the line `go install x`, a blank line, `</details>`, a blank line and `After.`, and styling is disabled
+- **THEN** the output is `▾ Install`, `  Run this:`, a blank line, `  go install x`, a blank line and `After.`
+
+#### Scenario: Details without summary
+- **WHEN** a document contains `<details>text</details>` and styling is disabled
+- **THEN** the output is `▾ Details` followed by `  text`
+
+#### Scenario: Nested details
+- **WHEN** a document contains `<details><summary>A</summary>`, a blank line, `<details><summary>B</summary>`, a blank line, `text`, a blank line, `</details>`, a blank line and `</details>`, and styling is disabled
+- **THEN** the output is `▾ A`, `  ▾ B` and `    text` on consecutive lines
+
+#### Scenario: Long content of details
+- **WHEN** the content of a `details` is a paragraph longer than the output width and it is rendered at width 40
+- **THEN** every line of the paragraph starts with 2 spaces and no line is wider than 40 columns
+
+#### Scenario: Details marker in a terminal
+- **WHEN** a document contains `<details><summary>More</summary>text</details>` and styling is enabled
+- **THEN** `▾` has the marker style of the theme and `More` has no style
+
+#### Scenario: Inline formatting tags
+- **WHEN** a paragraph contains `Press <kbd>Ctrl</kbd>+<kbd>C</kbd>, <b>bold</b> and <em>italic</em>` and styling is enabled
+- **THEN** `Ctrl` and `C` have the inline code style, `bold` is bold and `italic` is italic, and with styling disabled the output is `Press Ctrl+C, bold and italic`
+
+#### Scenario: Link in inline HTML
+- **WHEN** a paragraph contains `See <a href="https://example.com">the *guide*</a>.` and hyperlinks are disabled
+- **THEN** the output is `See the guide (https://example.com).`
+
+#### Scenario: Relative image in a file
+- **WHEN** the file `/home/u/proj/README.md` contains `<img src="img/arch.png" alt="arch">`, it is rendered with hyperlinks enabled, and the host name of the machine is `box`
+- **THEN** the visible output is `[image: arch]` and its hyperlink is `file://box/home/u/proj/img/arch.png`
+
+#### Scenario: Removed tags
+- **WHEN** a document contains `<picture><source srcset="dark.png"><img src="light.png" alt="logo"></picture>` and the paragraph `x<sup>2</sup> <span class="note">text</span>`, and hyperlinks are disabled
+- **THEN** the output contains `[image: logo] (light.png)` and `x2 text`
+
+#### Scenario: Unknown tag in text
+- **WHEN** a paragraph contains `Connect with ssh user@<host>.`
+- **THEN** the output is `Connect with ssh user@.`
+
+#### Scenario: Script, style and comments
+- **WHEN** a document contains `A`, a blank line, `<!-- note -->`, a blank line, `<script>alert(1)</script>`, a blank line, `<style>p {}</style>`, a blank line and `B`
+- **THEN** the output is `A`, a blank line and `B`
+
+#### Scenario: Character references
+- **WHEN** a document contains `<p>A &amp; B &lt;C&gt;</p>`
+- **THEN** the output is `A & B <C>`
+
+#### Scenario: Markdown in an HTML block
+- **WHEN** a document contains `<div>**bold**</div>`
+- **THEN** the output is `**bold**`
+
+#### Scenario: Unclosed and stray tags
+- **WHEN** a document contains the paragraph `<b>bold`, a blank line and the paragraph `next</b> text`, and styling is enabled
+- **THEN** `bold` is bold, and `next text` is not bold
+
+#### Scenario: Broken HTML
+- **WHEN** a document contains the line `<p align="center`
+- **THEN** the output is `<p align="center`

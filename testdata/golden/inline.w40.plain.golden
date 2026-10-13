@@ -10,8 +10,7 @@ bare URL https://example.com and an
 email user@example.com.
 
 An image [image: architecture]
-(docs/arch.png) and inline
-<kbd>Ctrl</kbd> HTML.
+(docs/arch.png) and inline Ctrl HTML.
 
 Escaped *stars* and an entity & stay
 literal.

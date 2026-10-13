@@ -33,11 +33,9 @@ destination (https://example.com/␛]0;pwned␇)
 
 ## HTML
 
-Inline HTML with ESC [31m: <span>␛[31m</span>
+Inline HTML with ESC [31m: ␛[31m
 
-<div>
 An HTML block with ESC [31m: ␛[31m
-</div>
 
 ## Code
 

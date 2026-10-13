@@ -35,6 +35,9 @@ type Options struct {
 	// relative link destinations are resolved against it; empty keeps every
 	// destination as written.
 	Dir string
+	// HTMLSource shows HTML blocks and inline HTML as their source instead
+	// of interpreting their tags.
+	HTMLSource bool
 }
 
 // Block is a rendered block: its lines and whether it is wider than the
@@ -137,15 +140,21 @@ func join(blocks []Block, blank bool) []text.Line {
 	return lines
 }
 
-// blocks renders the block children of parent.
+// blocks renders the block children of parent. Unless HTML is shown as its
+// source, HTML blocks are laid out by their tags, and a details holds the
+// blocks between its start and end tags.
 func (r *renderer) blocks(parent ast.Node, width int) []Block {
-	var out []Block
+	hb := newHTMLBlocks(r, width)
 	for n := parent.FirstChild(); n != nil; n = n.NextSibling() {
-		if b, ok := r.block(n, width); ok {
-			out = append(out, b)
+		if h, ok := n.(*ast.HTMLBlock); ok && !r.opts.HTMLSource {
+			hb.html(r.htmlSource(h))
+			continue
+		}
+		if b, ok := r.block(n, hb.contentWidth()); ok {
+			hb.add(b)
 		}
 	}
-	return out
+	return hb.end()
 }
 
 func (r *renderer) block(n ast.Node, width int) (Block, bool) {
@@ -167,11 +176,7 @@ func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 	case *ast.CodeBlock:
 		return r.code(r.rawLines(n), "", width), true
 	case *ast.HTMLBlock:
-		src := r.rawLines(n)
-		if n.HasClosure() {
-			src += string(n.ClosureLine.Value(r.src))
-		}
-		return verbatim(strings.TrimRight(src, "\n"), width), true
+		return verbatim(strings.TrimRight(r.htmlSource(n), "\n"), width), true
 	case *ast.List:
 		return r.list(n, width), true
 	case *ast.Blockquote:
@@ -202,6 +207,15 @@ func anyWide(blocks []Block) bool {
 		}
 	}
 	return false
+}
+
+// htmlSource returns the source of an HTML block with its closing line.
+func (r *renderer) htmlSource(n *ast.HTMLBlock) string {
+	src := r.rawLines(n)
+	if n.HasClosure() {
+		src += string(n.ClosureLine.Value(r.src))
+	}
+	return src
 }
 
 // rawLines returns the source lines of a block node.
@@ -341,11 +355,7 @@ func (r *renderer) alert(n *ast.Blockquote) (alertType, []text.Span, bool) {
 	marker := strings.TrimSpace(string(line))
 	for _, a := range alertTypes {
 		if strings.EqualFold(marker, a.marker) {
-			var rest []text.Span
-			for ; c != nil; c = c.NextSibling() {
-				rest = append(rest, r.inline(c, style.Style{})...)
-			}
-			return a, rest, true
+			return a, r.siblings(c, style.Style{}), true
 		}
 	}
 	return alertType{}, nil, false
@@ -465,11 +475,23 @@ func (r *renderer) definitions(n *east.DefinitionList, width int) Block {
 
 // inlines renders the inline children of n on top of the base style st.
 func (r *renderer) inlines(n ast.Node, st style.Style) []text.Span {
-	var out []text.Span
-	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-		out = append(out, r.inline(c, st)...)
+	return r.siblings(n.FirstChild(), st)
+}
+
+// siblings renders the inline node c and the siblings after it on top of the
+// base style st. An inline HTML tag applies to the siblings that follow it.
+func (r *renderer) siblings(c ast.Node, st style.Style) []text.Span {
+	h := &inlineHTML{r: r, base: st}
+	for ; c != nil; c = c.NextSibling() {
+		if raw, ok := c.(*ast.RawHTML); ok && !r.opts.HTMLSource {
+			for _, t := range htmlTokens(r.rawHTML(raw)) {
+				h.token(t)
+			}
+			continue
+		}
+		h.add(r.inline(c, h.style())...)
 	}
-	return out
+	return h.spans()
 }
 
 func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
@@ -519,15 +541,9 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 		}
 		return text.LinkSpans([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, url, hyperlinks)
 	case *ast.Image:
-		label := []text.Span{{Text: "[image: " + r.plainText(n, false) + "]", Style: style.Layer(st, r.pal.Link)}}
-		return text.LinkSpans(label, r.destination(n.Destination), hyperlinks)
+		return r.image(r.plainText(n, false), r.destination(n.Destination), st)
 	case *ast.RawHTML:
-		var b strings.Builder
-		for i := range n.Segments.Len() {
-			seg := n.Segments.At(i)
-			b.Write(seg.Value(r.src))
-		}
-		return []text.Span{{Text: b.String(), Style: st}}
+		return []text.Span{{Text: r.rawHTML(n), Style: st}}
 	case *east.TaskCheckBox:
 		if n.IsChecked {
 			return []text.Span{{Text: "[x] ", Style: st}}
@@ -541,6 +557,26 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 		return nil
 	}
 	return r.inlines(n, st)
+}
+
+// rawHTML returns the source of an inline HTML node.
+func (r *renderer) rawHTML(n *ast.RawHTML) string {
+	var b strings.Builder
+	for i := range n.Segments.Len() {
+		seg := n.Segments.At(i)
+		b.Write(seg.Value(r.src))
+	}
+	return b.String()
+}
+
+// image renders an image as its alt text in the form [image: alt], or as
+// [image] when the alt text is empty or only whitespace, linked to dest.
+func (r *renderer) image(alt, dest string, st style.Style) []text.Span {
+	label := "[image]"
+	if strings.TrimSpace(alt) != "" {
+		label = "[image: " + alt + "]"
+	}
+	return text.LinkSpans([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, dest, r.opts.Style.Hyperlinks)
 }
 
 // plainText collects the text of n's descendants. Raw text (code spans) is

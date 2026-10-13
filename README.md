@@ -74,6 +74,7 @@ termd --version             # print the version
 | `--no-pager` | | off | print directly instead of paging through `less` |
 | `--hyperlinks` | `auto`, `always`, `never` | `auto` | terminal hyperlinks; `auto` enables them only when stdout is a terminal |
 | `--theme` | `auto` or a theme name | `TERMD_THEME`, or `auto` when it is not set | color theme, see [Themes](#themes); `auto` asks the terminal for its background color |
+| `--html` | `render`, `source` | `render` | HTML in the document: `render` interprets its tags, see [HTML](#html); `source` shows it as written |
 | `--version` | | | print the version and exit |
 
 Exit status: `0` when the document was rendered (even if some diagrams were shown as source), `1` when the file cannot be read, `2` on a usage error.
@@ -136,7 +137,7 @@ When stdout is a terminal and the output is taller than the screen, or has a lin
 
 ### Links
 
-With hyperlinks enabled, a link shows only its text and opens its destination when clicked (Cmd+click in iTerm2). With hyperlinks disabled, a link is written as `text (url)`, and images as `[image: alt] (url)`. URLs are never truncated.
+With hyperlinks enabled, a link shows only its text and opens its destination when clicked (Cmd+click in iTerm2). With hyperlinks disabled, a link is written as `text (url)`, and images as `[image: alt] (url)`, or `[image] (url)` when the image has no alt text. URLs are never truncated.
 
 When the document is read from a file, relative destinations of links and images, such as `docs/guide.md` or `../img/arch.png`, are resolved against the directory of the file and become `file://` URLs with the host name of the machine, for example `file://myhost/home/me/project/docs/guide.md`, so a click opens the target with the default application of the system. The fragment of a destination (`guide.md#setup`) is kept, its query (`logo.png?raw=true`) is dropped. Absolute URLs, `#section` links and destinations that start with `/` are left as written; GitHub reads `/docs/x.md` as relative to the repository root, which termd does not know. A document read from stdin has no directory, so its links are left as written too. With hyperlinks disabled, `text (url)` always shows the destination as written in the document.
 
@@ -158,6 +159,27 @@ Every line of the paragraph is a term of its own, so two lines followed by one d
 Each term is shown on its own line, in bold in a terminal, and its definitions follow it indented by 4 columns, with wrapped lines and further blocks indented the same way. No theme colors a term; inline code and links in it keep their colors. The list has no blank lines, unless a definition has a blank line before it in the source or consists of more than one block: then a blank line separates the definitions from each other and from the term that follows them.
 
 GitHub does not support definition lists and renders such text as one paragraph, `Term : Definition of the term.`
+
+### HTML
+
+HTML in a document, such as the centered logo and the row of badges at the top of many READMEs, is shown by its tags instead of its source:
+
+| Tag | Output |
+|---|---|
+| `img` | `[image: alt]` linked to `src`, like a markdown image; `[image]` without `alt` |
+| `a href` | a link around its content, like a markdown link |
+| `p`, `div` | paragraphs; `align` and other attributes are ignored |
+| `br` | a line break, also in a table cell |
+| `h1` to `h6` | a heading |
+| `details`, `summary` | `▾` and the summary on one line, or `▾ Details` without a summary, and the content below it indented by 2 columns; the content is always shown |
+| `kbd`, `code` | the inline code style |
+| `b`, `strong`, `i`, `em` | bold, italic |
+
+Any other tag is removed and its text is kept: `x<sup>2</sup>` reads `x2`, and `<picture>` shows the `img` inside it. The content of `script` and `style` and HTML comments are removed. A placeholder in text such as `ssh user@<host>` is read as a tag and removed as well, as on GitHub. Links and images from HTML follow the rules of [Links](#links).
+
+Markdown inside an HTML block is not parsed, as in CommonMark: `<div>**bold**</div>` reads `**bold**`. A `details` holds the markdown blocks between the lines `<details>` and `</details>` when blank lines separate them from the tags; a `details` that is never closed ends with the list item, the block quote or the document it is in. Text that cannot be read as a tag, such as an unclosed `<p align="center`, is shown as text.
+
+`--html=source` shows HTML as written in the document.
 
 ### Themes
 
@@ -213,6 +235,7 @@ A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNIN
 - GNU screen does not support hyperlinks; use `--hyperlinks=never` there.
 - Background detection works on macOS, Linux and the BSDs; elsewhere the dark theme is used unless `--theme` or `TERMD_THEME` is given.
 - TOML (`+++`) frontmatter is rendered as markdown.
+- HTML tags without a row in the [HTML](#html) table lose their layout: `<hr>` is not shown, the whitespace of `<pre>` collapses, the items of `<ul>` and `<li>` run together and HTML tables lose their columns. `--html=source` shows such HTML as written.
 
 ## Roadmap
 

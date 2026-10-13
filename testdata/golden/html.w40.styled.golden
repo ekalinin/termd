@@ -1,0 +1,38 @@
+]8;;docs/logo.png\[4;34m[image: termd logo][0m]8;;\
+
+[1m# termd[0m
+
+]8;;https://github.com/ekalinin/termd/actions\[4;34m[image: CI][0m]8;;\ ]8;;https://pkg.go.dev/github.com/ekalinin/termd\[4;34m[image][0m]8;;\ ]8;;LICENSE\[4;34m[image: License:[0m]8;;\
+]8;;LICENSE\[4;34mMIT][0m]8;;\
+
+Markdown in the terminal.
+Tables, diagrams and links.
+
+]8;;docs/demo.gif\[4;34m[image: Demo][0m]8;;\
+
+[1m## Usage[0m
+
+Press [36mCtrl[0m+[36mC[0m to quit. See ]8;;docs/guide.md\[4;34mthe [0m[3;4;34mguide[0m]8;;\ for
+details, and connect with ssh user@.
+
+E = mc2, H2O, [1mbold[0m, [3mitalic[0m and [36mcode[0m.
+
+[2m▾ [0mInstallation from source
+  Build it with [1mGo[0m:
+
+  go install github.com/ekalinin/termd/cmd/termd@latest
+
+  [2m▾ [0mNested
+    A nested details block with a
+    paragraph that is long enough to
+    wrap at every width of the golden
+    files.
+
+[1mKey[0m │ [1mDescription[0m
+────┼────────────
+[36mq[0m   │ quit
+    │ the pager
+[36m/[0m   │ search
+
+[2m▾ [0mSponsors
+  ]8;;https://opencollective.com/x/sponsor/0/website\[4;34m[image][0m]8;;\ ]8;;https://opencollective.com/x/sponsor/1/website\[4;34m[image][0m]8;;\

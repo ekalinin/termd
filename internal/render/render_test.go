@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	emast "github.com/yuin/goldmark-emoji/ast"
 	"github.com/yuin/goldmark/ast"
 	east "github.com/yuin/goldmark/extension/ast"
 	"golang.org/x/net/html"
@@ -41,7 +42,7 @@ func renderLines(src string, opts Options) []string {
 }
 
 func TestParseGFM(t *testing.T) {
-	src := "| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~text~~ https://example.com\n\nText[^1].\n\n[^1]: Note.\n\nTerm\n: Definition.\n"
+	src := "| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~text~~ https://example.com\n\nText[^1].\n\n[^1]: Note.\n\nTerm\n: Definition.\n\n:rocket:\n"
 	found := map[string]bool{}
 	_ = ast.Walk(Parse([]byte(src)), func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
@@ -64,11 +65,13 @@ func TestParseGFM(t *testing.T) {
 				found["definition term"] = true
 			case *east.DefinitionDescription:
 				found["definition description"] = true
+			case *emast.Emoji:
+				found["emoji"] = true
 			}
 		}
 		return ast.WalkContinue, nil
 	})
-	for _, k := range []string{"table", "task", "strikethrough", "autolink", "footnote reference", "footnote list", "definition list", "definition term", "definition description"} {
+	for _, k := range []string{"table", "task", "strikethrough", "autolink", "footnote reference", "footnote list", "definition list", "definition term", "definition description", "emoji"} {
 		if !found[k] {
 			t.Errorf("no %s node in the AST", k)
 		}
@@ -499,6 +502,61 @@ func TestDetails(t *testing.T) {
 			t.Errorf("got %q, want %q first", got, want)
 		}
 	})
+}
+
+func TestEmojiShortcodes(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"paragraph", "Fast :rocket: and tested :white_check_mark:\n", []string{"Fast 🚀 and tested ✅"}},
+		{"heading", "# Features :sparkles:\n", []string{"# Features ✨"}},
+		{"alert", "> [!NOTE]\n> :warning: Read this.\n", []string{"│ Note", "│ ⚠️ Read this."}},
+		{"link text and destination", "[docs :book:](https://example.com/:book:)\n", []string{"docs 📖 (https://example.com/:book:)"}},
+		{"between inline HTML tags", "Press <kbd>:arrow_up:</kbd> to scroll.\n", []string{"Press ⬆️ to scroll."}},
+		{"after a letter or a digit", "a:b:c, foo:rocket:bar, 1:zap: and x :b: y\n", []string{"a:b:c, foo:rocket:bar, 1:zap: and x 🅱️ y"}},
+		{"adjacent", ":rocket::zap:\n", []string{"🚀⚡"}},
+		{"names that are not emoji", ":octocat: and :not_an_emoji:\n", []string{":octocat: and :not_an_emoji:"}},
+		{
+			"code and bare URLs",
+			"`:zap:` and https://example.com/:smile:/x\n\n```\necho :zap:\n```\n",
+			[]string{":zap: and https://example.com/:smile:/x", "", "echo :zap:"},
+		},
+		{"image alt text", "![logo :star:](logo.png)\n", []string{"[image: logo :star:] (logo.png)"}},
+		{"HTML block", "<p align=\"center\">:rocket: Fast</p>\n", []string{":rocket: Fast"}},
+		{"frontmatter", "---\ntitle: \":rocket: Launch\"\n---\n", []string{"title │ :rocket: Launch"}},
+		{"definition list", "Term :one:\n: Def :two:\n", []string{"Term 1️⃣", "    Def 2️⃣"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := renderLines(tt.src, plain(80))
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
+			}
+		})
+	}
+}
+
+func TestEmojiStyles(t *testing.T) {
+	for _, tt := range []struct{ src, same string }{
+		{"**:tada:**\n", "**🎉**\n"},
+		{"# Features :sparkles:\n", "# Features ✨\n"},
+	} {
+		if got, want := Render([]byte(tt.src), styled(80)), Render([]byte(tt.same), styled(80)); got != want {
+			t.Errorf("%q = %q, want %q as for %q", tt.src, got, want, tt.same)
+		}
+	}
+	got := renderLines("| Feature | Status |\n|---|---|\n| Tables | :white_check_mark: |\n| Diagrams | :warning: |\n", plain(80))
+	if len(got) != 4 || !strings.HasSuffix(got[2], "│ ✅") || !strings.HasSuffix(got[3], "│ ⚠️") {
+		t.Fatalf("got %q", got)
+	}
+	if column(got[0], "│") != column(got[1], "┼") || column(got[0], "│") != column(got[2], "│") || column(got[0], "│") != column(got[3], "│") {
+		t.Errorf("separators are not aligned: %q", got)
+	}
+	if text.Width("✅") != 2 || text.Width("⚠️") != 2 {
+		t.Errorf("emoji widths %d and %d, want 2", text.Width("✅"), text.Width("⚠️"))
+	}
 }
 
 func TestWideBlockIsNotTruncated(t *testing.T) {

@@ -1,0 +1,40 @@
+# Emoji shortcodes ✨
+
+termd is fast ⚡ and tested ✅, and a long paragraph with 🚀
+wraps at every width of the golden files like any other text
+🎉.
+
+• Tables 📊
+• Diagrams 🎨
+• Bold 🔥 and italic ⭐
+
+│ Warning
+│ ⚠️ Shortcodes after a space are replaced.
+
+Feature  │ Status
+─────────┼───────
+Tables   │ ✅
+Diagrams │ ⚠️
+Plugins  │ ❌
+
+See the docs 📖 (https://example.com/docs) and the
+footnote[1]. Press ⬆️ to scroll.
+
+Term 1️⃣
+    Definition 2️⃣
+
+## Stays text
+
+Glued: a:b:c, foo:rocket:bar, 1:zap:. Unknown: :octocat: and
+:not_an_emoji:.
+
+Code :zap:, a bare URL https://example.com/:smile:/x and an
+image [image: logo :star:] (logo.png).
+
+echo :zap:
+
+:rocket: in an HTML block
+
+────────────────────────────────────────────────────────────
+
+1. A footnote with 💡.

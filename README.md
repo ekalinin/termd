@@ -12,6 +12,7 @@ Existing terminal viewers often break tables (truncated headers, words split in 
 - **Syntax highlighting** - fenced code blocks with a known language are highlighted, with a dark or light theme chosen by the terminal background.
 - **Color themes** - `dark` and `light` follow the color scheme of the terminal; ten named themes such as `dracula`, `nord` or `catppuccin-mocha` color headings, links, inline code, markers, alerts, tables and code with the palette of their scheme.
 - **Clickable links** - links are OSC 8 terminal hyperlinks, so a table cell shows `docs` instead of a long URL.
+- **Emoji shortcodes** - GitHub shortcodes such as `:rocket:` or `:white_check_mark:` are shown as their emoji. A shortcode right after a letter or a digit, as in `a:b:c`, stays text, as on GitHub, and shortcodes in code, link destinations, image alt text, HTML blocks and frontmatter are not replaced.
 - **Paging** - long or wide output opens in `less -RS`.
 - **Pipe-friendly** - when stdout is not a terminal, the output is plain text without escape sequences.
 

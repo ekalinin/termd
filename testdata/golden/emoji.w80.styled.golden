@@ -1,0 +1,37 @@
+[1m# Emoji shortcodes ✨[0m
+
+termd is fast ⚡ and tested ✅, and a long paragraph with 🚀 wraps at every
+width of the golden files like any other text 🎉.
+
+[2m• [0mTables 📊
+[2m• [0mDiagrams 🎨
+[2m• [0m[1mBold 🔥[0m and [3mitalic ⭐[0m
+
+[33m│ [0m[1;33mWarning[0m
+[33m│ [0m⚠️ Shortcodes after a space are replaced.
+
+[1mFeature[0m  │ [1mStatus[0m
+─────────┼───────
+Tables   │ ✅
+Diagrams │ ⚠️
+Plugins  │ ❌
+
+See ]8;;https://example.com/docs\[4;34mthe docs 📖[0m]8;;\ and the footnote[1]. Press [36m⬆️[0m to scroll.
+
+[1mTerm 1️⃣[0m
+    Definition 2️⃣
+
+[1m## Stays text[0m
+
+Glued: a:b:c, foo:rocket:bar, 1:zap:. Unknown: :octocat: and :not_an_emoji:.
+
+Code [36m:zap:[0m, a bare URL ]8;;https://example.com/:smile:/x\[4;34mhttps://example.com/:smile:/x[0m]8;;\ and an image ]8;;logo.png\[4;34m[image: logo[0m]8;;\
+]8;;logo.png\[4;34m:star:][0m]8;;\.
+
+echo :zap:
+
+:rocket: in an HTML block
+
+[2m────────────────────────────────────────────────────────────────────────────────[0m
+
+[2m1. [0mA footnote with 💡.

@@ -6,9 +6,12 @@ import (
 	"strings"
 
 	"github.com/yuin/goldmark"
+	emast "github.com/yuin/goldmark-emoji/ast"
+	"github.com/yuin/goldmark-emoji/definition"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	east "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/parser"
 	gtext "github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 
@@ -47,10 +50,14 @@ type Block struct {
 	Wide  bool
 }
 
-// Parse parses src as CommonMark with the GFM extensions, footnotes and
-// definition lists.
+// Parse parses src as CommonMark with the GFM extensions, footnotes,
+// definition lists and GitHub emoji shortcodes.
 func Parse(src []byte) ast.Node {
-	md := goldmark.New(goldmark.WithExtensions(extension.GFM, extension.Footnote, extension.DefinitionList))
+	md := goldmark.New(
+		goldmark.WithExtensions(extension.GFM, extension.Footnote, extension.DefinitionList),
+		// The priority of the goldmark-emoji extension.
+		goldmark.WithParserOptions(parser.WithInlineParsers(util.Prioritized(emojiParser{definition.Github()}, 999))),
+	)
 	return md.Parser().Parse(gtext.NewReader(src))
 }
 
@@ -512,6 +519,8 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 		return spans
 	case *ast.String:
 		return []text.Span{{Text: string(n.Value), Style: st}}
+	case *emast.Emoji:
+		return []text.Span{{Text: string(n.Value.Unicode), Style: st}}
 	case *ast.CodeSpan:
 		cs := style.Layer(st, r.pal.InlineCode)
 		return []text.Span{{Text: r.plainText(n, true), Style: cs}}
@@ -599,6 +608,9 @@ func (r *renderer) plainText(n ast.Node, raw bool) string {
 			}
 		case *ast.String:
 			b.Write(c.Value)
+		case *emast.Emoji:
+			// GitHub keeps a shortcode in the alt text of an image.
+			b.WriteString(":" + string(c.ShortName) + ":")
 		}
 		return ast.WalkContinue, nil
 	})

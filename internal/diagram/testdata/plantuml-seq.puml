@@ -1,0 +1,29 @@
+@startuml
+title Login flow
+skinparam monochrome true
+hide footbox
+actor User
+box "Backend" #LightBlue
+participant "Web Server" as Web
+database DB
+end box
+autonumber
+User -> Web ++ : POST /login
+Web -> DB : SELECT user
+DB --> Web : row
+alt valid password
+  Web --> User : 302 /home
+else invalid
+  Web -[#red]>x User : 401
+end
+note right of DB
+  passwords are
+  hashed
+end note
+== Session ==
+group Refresh
+  User ->> Web : ping
+end
+ref over User, Web : Logout
+return done
+@enduml

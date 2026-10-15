@@ -1,0 +1,11 @@
+@startmindmap
+title Linux distributions
+* Debian
+** Ubuntu
+*** Linux Mint
+***[#Orange] Kubuntu
+** LMDE
+**_ SteamOS
+**:Raspberry Pi OS
+for ARM boards;
+@endmindmap

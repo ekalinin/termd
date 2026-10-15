@@ -1,0 +1,10 @@
+Linux distributions
+
+Debian
+├── Ubuntu
+│   ├── Linux Mint
+│   └── Kubuntu
+├── LMDE
+├── SteamOS
+└── Raspberry Pi OS
+    for ARM boards

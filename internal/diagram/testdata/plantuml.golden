@@ -1,5 +1,7 @@
-┌─ plantuml - not supported ┐
-│ @startuml                 │
-│ Alice -> Bob: hello       │
-│ @enduml                   │
-└───────────────────────────┘
+┌───────┐     ┌─────┐
+│ Alice │     │ Bob │
+└───┬───┘     └──┬──┘
+    │            │
+    │ hello      │
+    ├───────────►│
+    │            │

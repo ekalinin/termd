@@ -86,8 +86,12 @@ func TestGolden(t *testing.T) {
 }
 
 func TestSupportedTypesAreRendered(t *testing.T) {
-	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd", "mindmap.mmd"} {
-		res := Render("mermaid", readFixture(t, name), 200)
+	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd", "mindmap.mmd", "plantuml.puml", "plantuml-seq.puml", "plantuml-mindmap.puml"} {
+		lang := "mermaid"
+		if filepath.Ext(name) == ".puml" {
+			lang = "plantuml"
+		}
+		res := Render(lang, readFixture(t, name), 200)
 		if res.Fallback {
 			t.Errorf("%s fell back to source:\n%s", name, lines(res))
 		}
@@ -107,7 +111,7 @@ func TestFallbackLabels(t *testing.T) {
 		want       []string
 	}{
 		{"mermaid", "state.mmd", []string{"mermaid", "stateDiagram-v2", "not supported"}},
-		{"plantuml", "plantuml.puml", []string{"plantuml"}},
+		{"plantuml", "plantuml-class.puml", []string{"plantuml", "class", "not supported"}},
 		{"mermaid", "seq-invalid.mmd", []string{"mermaid", "sequenceDiagram", "invalid syntax"}},
 	}
 	for _, tt := range tests {
@@ -240,6 +244,151 @@ func TestMindmapWidth(t *testing.T) {
 			t.Errorf("got %q, wide %v", got, res.Wide)
 		}
 	})
+}
+
+func TestPlantumlType(t *testing.T) {
+	tests := []struct{ src, want string }{
+		{"@startuml\nAlice -> Bob: hello\n@enduml", "sequence"},
+		{"Alice -> Bob: hello", "sequence"},
+		{"participant A", "sequence"},
+		{"@startuml\nclass User\n@enduml", "class"},
+		{"interface I", "class"},
+		{"enum E", "class"},
+		{"abstract A", "class"},
+		{"usecase U", "usecase"},
+		{"state S", "state"},
+		{"[*] --> A", "state"},
+		{"component C", "component"},
+		{"object O", "object"},
+		{"node N", "deployment"},
+		{"start\n:step;\nstop", "activity"},
+		{":step;", "activity"},
+		{"@startmindmap\n* Root\n@endmindmap", "mindmap"},
+		{"@startgantt\n[Task] lasts 5 days\n@endgantt", "gantt"},
+		{"@startwbs\n* Root\n@endwbs", "wbs"},
+		{"skinparam monochrome true", ""},
+	}
+	for _, tt := range tests {
+		if got := plantumlType(tt.src); got != tt.want {
+			t.Errorf("plantumlType(%q) = %q, want %q", tt.src, got, tt.want)
+		}
+	}
+}
+
+func TestPlantumlSequence(t *testing.T) {
+	tests := []struct{ name, puml, mermaid string }{
+		{
+			"messages",
+			"Alice -> Bob : hello\nBob --> Alice : ok\nAlice ->> Bob : async\nAlice -> Alice : self",
+			"Alice->>Bob: hello\nBob-->>Alice: ok\nAlice-)Bob: async\nAlice->>Alice: self",
+		},
+		{
+			"participants",
+			"actor User\ndatabase \"Main DB\" as DB\nUser -> DB : query",
+			"actor User\nparticipant DB as Main DB\nUser->>DB: query",
+		},
+		{
+			"reversed and decorated arrows",
+			"participant Alice\nparticipant Bob\nBob <- Alice : hi\nAlice ->x Bob : lost\nAlice -[#red]> Bob : red\nAlice <-> Bob : both",
+			"participant Alice\nparticipant Bob\nAlice->>Bob: hi\nAlice->>Bob: lost\nAlice->>Bob: red\nAlice->>Bob: both",
+		},
+		{
+			"blocks",
+			"A -> B : start\nalt valid\nA -> B : ok\nelse invalid\nA -> B : no\nend\nloop 3 times\nA -> B : ping\nend\npar first\nA -> B : x\nelse second\nB -> A : y\nend",
+			"A->>B: start\nalt valid\nA->>B: ok\nelse invalid\nA->>B: no\nend\nloop 3 times\nA->>B: ping\nend\npar first\nA->>B: x\nand second\nB->>A: y\nend",
+		},
+		{
+			"group, divider and reference",
+			"participant A\nparticipant B\nparticipant C\ngroup Retry\nA -> B : try\nend\n== Phase 2 ==\nref over A, B : Login",
+			"participant A\nparticipant B\nparticipant C\nnote over A,C: Retry\nA->>B: try\nnote over A,C: Phase 2\nnote over A,B: ref Login",
+		},
+		{
+			"multi-line note",
+			"A -> B : x\nnote right of B\nfirst\nsecond\nend note",
+			"A->>B: x\nnote right of B: first second",
+		},
+		{
+			"notes attached to a message",
+			"participant A\nparticipant B\nparticipant C\nA -> B : call\nnote left : sent\nnote right : received\nnote across : all",
+			"participant A\nparticipant B\nparticipant C\nA->>B: call\nnote left of A: sent\nnote right of B: received\nnote over A,C: all",
+		},
+		{"activation and return", "A -> B ++ : call\nreturn ok", "A->>+B: call\nB-->>-A: ok"},
+		{
+			"ignored lines",
+			"skinparam monochrome true\nskinparam participant {\nBorderColor red\n}\nhide footbox\n' a comment\nheader\nPage 1\nendheader\nA -> B : x\n...\n|||\n!theme plain\nB -> A : y",
+			"A->>B: x\nB->>A: y",
+		},
+		{"title and line breaks", "title Login\nA -> B : first\\nsecond", "---\ntitle: Login\n---\nsequenceDiagram\nA->>B: first second"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Render("plantuml", "@startuml\n"+tt.puml+"\n@enduml", 80)
+			if res.Fallback {
+				t.Fatalf("fell back:\n%s", lines(res))
+			}
+			mermaid := tt.mermaid
+			if !strings.HasPrefix(mermaid, "---") {
+				mermaid = "sequenceDiagram\n" + mermaid
+			}
+			if got, want := lines(res), lines(Render("mermaid", mermaid, 80)); got != want {
+				t.Errorf("got\n%s\nwant\n%s", got, want)
+			}
+		})
+	}
+	t.Run("unsupported line", func(t *testing.T) {
+		res := Render("plantuml", "@startuml\nA -> B : call\n[-> A : in\n@enduml", 80)
+		if !res.Fallback || !strings.Contains(res.Lines[0].String(), "plantuml - sequence - unsupported line 3") {
+			t.Errorf("got\n%s", lines(res))
+		}
+	})
+}
+
+func TestPlantumlMindmap(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			"stars",
+			"* Debian\n** Ubuntu\n*** Linux Mint\n*** Kubuntu\n** LMDE",
+			[]string{"Debian", "├── Ubuntu", "│   ├── Linux Mint", "│   └── Kubuntu", "└── LMDE"},
+		},
+		{"sides", "+ OS\n++ Linux\n-- Windows", []string{"OS", "├── Linux", "└── Windows"}},
+		{
+			"node decorations",
+			"* Root\n**[#Orange] Colored\n**_ Boxless\n**:First\nsecond;",
+			[]string{"Root", "├── Colored", "├── Boxless", "└── First", "    second"},
+		},
+		{"title", "title Ideas\n* Root", []string{"Ideas", "", "Root"}},
+		{"line break", "* Root\n** a\\nb", []string{"Root", "└── a", "    b"}},
+		{"left side and comments", "' a comment\n* Root\n** A\nleft side\n** B", []string{"Root", "├── A", "└── B"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Render("plantuml", "@startmindmap\n"+tt.src+"\n@endmindmap", 80)
+			if res.Fallback {
+				t.Fatalf("fell back:\n%s", lines(res))
+			}
+			if got, want := lines(res), strings.Join(tt.want, "\n")+"\n"; got != want {
+				t.Errorf("got\n%s\nwant\n%s", got, want)
+			}
+		})
+	}
+	errs := []struct{ name, src, reason string }{
+		{"more than one root", "* A\n* B", "more than one root"},
+		{"unclosed node", "* Root\n**:open", "unclosed node"},
+		{"unsupported line", "* Root\nplain text", "unsupported line 3"},
+		{"no nodes", "", "no nodes"},
+	}
+	for _, tt := range errs {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Render("plantuml", "@startmindmap\n"+tt.src+"\n@endmindmap", 80)
+			if label, want := res.Lines[0].String(), "plantuml - mindmap - "+tt.reason; !res.Fallback || !strings.Contains(label, want) {
+				t.Errorf("label %q lacks %q", label, want)
+			}
+		})
+	}
 }
 
 func TestFrameIsRectangular(t *testing.T) {

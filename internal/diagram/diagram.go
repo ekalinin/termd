@@ -123,6 +123,8 @@ func Render(lang, src string, width int) Result {
 		out, err = safeRender(src, mdiagram.DefaultConfig())
 	case "flowchart", "graph":
 		out, err = renderFlowchart(src, width)
+	case "mindmap":
+		out, err = renderMindmap(src, width)
 	case "":
 		return fallback(src, width, lang, "no diagram type")
 	default:

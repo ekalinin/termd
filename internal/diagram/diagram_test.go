@@ -86,7 +86,7 @@ func TestGolden(t *testing.T) {
 }
 
 func TestSupportedTypesAreRendered(t *testing.T) {
-	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd"} {
+	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd", "mindmap.mmd"} {
 		res := Render("mermaid", readFixture(t, name), 200)
 		if res.Fallback {
 			t.Errorf("%s fell back to source:\n%s", name, lines(res))
@@ -130,6 +130,116 @@ func TestFallbackLabels(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestMindmap(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			"tree",
+			"mindmap\n  root((Plan))\n    Goals\n      Faster\n      Simpler\n    Risks",
+			[]string{"Plan", "├── Goals", "│   ├── Faster", "│   └── Simpler", "└── Risks"},
+		},
+		{
+			"shapes",
+			"mindmap\n  root((A))\n    b[Square]\n    c(Rounded)\n    d))Bang((\n    e)Cloud(\n    f{{Hexagon}}",
+			[]string{"A", "├── Square", "├── Rounded", "├── Bang", "├── Cloud", "└── Hexagon"},
+		},
+		{
+			"icons and classes",
+			"mindmap\n  R\n    Child\n    ::icon(fa fa-book)\n    :::urgent large",
+			[]string{"R", "└── Child"},
+		},
+		{"markdown string", "mindmap\n  root[\"`**Root** text`\"]", []string{"Root text"}},
+		{"markdown string with a line break", "mindmap\n  root[\"`First line\nsecond line`\"]", []string{"First line", "second line"}},
+		{
+			"line break in a node",
+			"mindmap\n  R\n    On effectiveness<br/>and features\n    Next",
+			[]string{"R", "├── On effectiveness", "│   and features", "└── Next"},
+		},
+		{
+			"nearest node with less indentation",
+			"mindmap\n  R\n    A\n        B\n      C",
+			[]string{"R", "└── A", "    ├── B", "    └── C"},
+		},
+		{"comments", "mindmap\n  %% a comment\n  R\n    A", []string{"R", "└── A"}},
+		{"title", "---\ntitle: Ideas\n---\nmindmap\n  R\n    A", []string{"Ideas", "", "R", "└── A"}},
+		// A tab counts as 4 spaces, so A and B are siblings.
+		{"tabs", "mindmap\n\tR\n\t\tA\n        B", []string{"R", "├── A", "└── B"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Render("mermaid", tt.src, 80)
+			if res.Fallback {
+				t.Fatalf("fell back:\n%s", lines(res))
+			}
+			if got, want := lines(res), strings.Join(tt.want, "\n")+"\n"; got != want {
+				t.Errorf("got\n%s\nwant\n%s", got, want)
+			}
+		})
+	}
+	errs := []struct{ name, src, reason string }{
+		{"more than one root", "mindmap\n  A\n  B", "more than one root"},
+		{"unclosed shape", "mindmap\n  root((Plan)", "unclosed shape"},
+		{"unclosed markdown string", "mindmap\n  root[\"`Plan\n    A", "unclosed markdown string"},
+		{"no nodes", "mindmap", "no nodes"},
+	}
+	for _, tt := range errs {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Render("mermaid", tt.src, 80)
+			if !res.Fallback {
+				t.Fatalf("did not fall back:\n%s", lines(res))
+			}
+			if label, want := res.Lines[0].String(), "mermaid - mindmap - "+tt.reason; !strings.Contains(label, want) {
+				t.Errorf("label %q lacks %q", label, want)
+			}
+		})
+	}
+}
+
+func TestMindmapWidth(t *testing.T) {
+	t.Run("long text", func(t *testing.T) {
+		res := Render("mermaid", "mindmap\n  R\n    Short\n    "+strings.Repeat("word ", 8), 30)
+		got := strings.Split(strings.TrimSuffix(lines(res), "\n"), "\n")
+		if len(got) < 4 || got[1] != "├── Short" || !strings.HasPrefix(got[2], "└── word") {
+			t.Fatalf("text did not wrap: %q", got)
+		}
+		for _, l := range got[3:] {
+			if !strings.HasPrefix(l, "    word") {
+				t.Errorf("continuation line %q", l)
+			}
+		}
+		if res.Wide || width(res) > 30 {
+			t.Errorf("wider than 30: %q", got)
+		}
+	})
+	t.Run("deep tree", func(t *testing.T) {
+		src := "mindmap\n  R\n    A\n      B\n        C\n          D\n            " + strings.Repeat("abc ", 7)
+		res := Render("mermaid", src, 20)
+		got := strings.Split(strings.TrimSuffix(lines(res), "\n"), "\n")
+		node := got[5:]
+		if len(node) < 3 || !strings.HasSuffix(got[4], "└── D") {
+			t.Fatalf("text at depth 5 did not wrap: %q", got)
+		}
+		for _, l := range node {
+			if w := text.Width(l); w <= 20 || w > 30 {
+				t.Errorf("line %q is %d wide, want text of at most 10 columns after 20", l, w)
+			}
+		}
+		if !res.Wide {
+			t.Error("not wide")
+		}
+	})
+	t.Run("long word", func(t *testing.T) {
+		word := strings.Repeat("x", 36)
+		res := Render("mermaid", "mindmap\n  R\n    "+word, 30)
+		if got := lines(res); got != "R\n└── "+word+"\n" || !res.Wide {
+			t.Errorf("got %q, wide %v", got, res.Wide)
+		}
+	})
 }
 
 func TestFrameIsRectangular(t *testing.T) {

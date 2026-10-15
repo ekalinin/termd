@@ -1,0 +1,38 @@
+[1m# Mindmaps[0m
+
+mindmap
+├── Origins
+│   ├── Long history
+│   └── Popularisation
+│       └── British popular psychology author Tony Buzan
+├── Research
+│   ├── On effectiveness
+│   │   and features
+│   └── On Automatic creation
+│       └── Uses
+│           ├── Creative techniques
+│           ├── Strategic planning
+│           └── Argument mapping
+└── Tools
+    ├── Pen and paper
+    └── Mermaid
+
+Release plan
+
+v1.0 release
+├── Features
+│   ├── Tables
+│   └── Diagrams
+├── Docs
+└── Checks
+    ├── CI on every pull request, with the golden files of
+    │   every fixture at 40, 60 and 80 columns
+    └── Release notes
+
+┌─ mermaid - mindmap - more than one root ┐
+│ mindmap                                 │
+│   First root                            │
+│   Second root                           │
+└─────────────────────────────────────────┘
+
+The paragraph after the broken mindmap is rendered normally.

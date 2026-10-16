@@ -1,0 +1,67 @@
+[1m# PlantUML[0m
+
+Checkout
+
+┌──────────┐     ┌──────┐     ┌───────┐
+│ Customer │     │ Shop │     │ Stock │
+└─────┬────┘     └───┬──┘     └───┬───┘
+      │              │            │
+      │ order        │            │
+      ├─────────────►│            │
+      │              ┃            │
+      │              ┃ reserve    │
+      │              ┠───────────►│
+      │            ┌─[alt in stock]─┐
+      │            │ ┃            │ │
+      │            │ ┃ reserved   │ │
+      │            │ ┃◄┈┈┈┈┈┈┈┈┈┈┈┤ │
+      │            ├┈[out of stock]┈┤
+      │            │ ┃            │ │
+      │            │ ┃ none       │ │
+      │            │ ┃◄┈┈┈┈┈┈┈┈┈┈┈┤ │
+      │            │ ┃            │ │
+      │            └────────────────┘
+      │              ┃            │
+      │    ┌────────────────────┐ │
+      │    │ the customer waits │ │
+      │    └────────────────────┘ │
+      │              ┃            │
+      │ confirmation ┃            │
+      │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┨            │
+      │              │            │
+
+┌────────┐     ┌────────┐
+│ Client │     │ Server │
+└────┬───┘     └────┬───┘
+     │              │
+     │ ping         │
+     ├─────────────►│
+     │              │
+     │ pong         │
+     │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+     │              │
+
+Release
+├── Features
+│   ├── Tables
+│   └── Diagrams with a long description
+│       that wraps at narrow widths
+└── Docs
+
+┌─ plantuml - class - not supported ┐
+│ @startuml                         │
+│ class User {                      │
+│   name : string                   │
+│ }                                 │
+│ @enduml                           │
+└───────────────────────────────────┘
+
+┌─ plantuml - sequence - unsupported line 3 ┐
+│ @startuml                                 │
+│ A -> B : call                             │
+│ [-> A : incoming                          │
+│ @enduml                                   │
+└───────────────────────────────────────────┘
+
+The paragraph after the diagrams is
+rendered normally.

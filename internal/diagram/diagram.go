@@ -113,7 +113,15 @@ func blockWidth(s string) int {
 func Render(lang, src string, width int) Result {
 	src = strings.TrimRight(src, "\n")
 	if lang != "mermaid" {
-		return fallback(src, width, lang, "not supported")
+		typ := plantumlType(src)
+		out, err := renderPlantUML(typ, src, width)
+		switch {
+		case typ == "":
+			return fallback(src, width, lang, "not supported")
+		case err != nil:
+			return fallback(src, width, lang, typ, reason(err))
+		}
+		return result(out, width)
 	}
 	typ := MermaidType(src)
 	var out string
@@ -133,6 +141,12 @@ func Render(lang, src string, width int) Result {
 	if err != nil {
 		return fallback(src, width, lang, typ, reason(err))
 	}
+	return result(out, width)
+}
+
+// result turns drawn diagram text into a block, wide when it is wider than
+// width.
+func result(out string, width int) Result {
 	lines := strings.Split(out, "\n")
 	res := Result{Lines: make([]text.Line, len(lines))}
 	for i, l := range lines {

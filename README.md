@@ -7,7 +7,7 @@ Existing terminal viewers often break tables (truncated headers, words split in 
 ## Features
 
 - **Tables** - widths are measured by grapheme clusters, so emoji (including ZWJ sequences and variation selectors) and CJK text keep columns aligned. Words are never split, headers are never truncated, and free width goes to the columns with long text. Column alignment from the markdown source is kept. A table that does not fit even at its minimum widths is emitted in full and can be scrolled horizontally in the pager.
-- **Mermaid diagrams as text** - `sequenceDiagram`, `flowchart`/`graph` and `erDiagram` are drawn with box-drawing characters, and `mindmap` as an indented tree. Any other diagram is shown as its source in a labelled frame instead of failing.
+- **Mermaid and PlantUML diagrams as text** - `sequenceDiagram`, `flowchart`/`graph` and `erDiagram` are drawn with box-drawing characters, and `mindmap` as an indented tree. PlantUML sequence diagrams and mindmaps are drawn the same way, without Java or PlantUML. Any other diagram is shown as its source in a labelled frame instead of failing.
 - **Frontmatter** - a YAML frontmatter block is shown as a table of its keys and values at the top of the document.
 - **Syntax highlighting** - fenced code blocks with a known language are highlighted, with a dark or light theme chosen by the terminal background.
 - **Color themes** - `dark` and `light` follow the color scheme of the terminal; ten named themes such as `dracula`, `nord` or `catppuccin-mocha` color headings, links, inline code, markers, alerts, tables and code with the palette of their scheme.
@@ -216,7 +216,9 @@ termd draws a `mindmap` itself, as an indented tree like the output of the `tree
 
 A frontmatter `title` is printed above the diagram. A flowchart that is too wide is first compacted; a left-to-right one that still does not fit is laid out top-to-bottom. A diagram that still does not fit is emitted in full and scrolls horizontally in the pager.
 
-Everything else (other mermaid types, PlantUML, a diagram with a syntax error) is shown as source in a frame labelled with the language, the diagram type and the reason. One broken diagram never stops the rest of the document from rendering.
+PlantUML sequence diagrams are translated into mermaid sequence diagrams and drawn the same way; no external program runs. Constructs without a mermaid counterpart are approximated: `boundary`, `control`, `entity`, `database`, `collections` and `queue` are participants, arrow decorations such as `->x` or `-[#red]>` and the box of a `group` are dropped, the label of a `group`, a divider `== ... ==`, `ref over` and `note across` become notes, and the lines of a multi-line note are joined. Layout and style lines such as `skinparam`, `hide footbox`, `...` and `|||` are ignored. A line that termd cannot read shows the diagram as source labelled with its number, for example `unsupported line 7`. PlantUML mindmaps (`@startmindmap`, with `*`, `+` or `-` for the depth) are drawn as the same indented tree as mermaid mindmaps. The type of a PlantUML block comes from its `@start` line and its keywords, so a class or activity diagram is shown as source labelled with its type.
+
+Everything else (other mermaid and PlantUML types, a diagram with a syntax error) is shown as source in a frame labelled with the language, the diagram type and the reason. One broken diagram never stops the rest of the document from rendering.
 
 ### Frontmatter
 
@@ -230,7 +232,7 @@ A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNIN
 
 ## Limitations
 
-- `stateDiagram`, `classDiagram`, `gantt` and PlantUML are shown as source.
+- `stateDiagram`, `classDiagram`, `gantt` and PlantUML diagrams other than sequence diagrams and mindmaps are shown as source.
 - Emoji inside diagram labels can misalign, because the diagram library measures text by code points.
 - The `box` group frame in sequence diagrams overlaps message lines visually; the diagram stays correct.
 - Terminals disagree on the width of emoji with a variation selector (for example `⚠️`). termd follows Unicode and counts 2 columns; in iTerm2 this matches the "Use Unicode version 9+ widths" setting.
@@ -243,7 +245,6 @@ A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNIN
 ## Roadmap
 
 - Rendering of `stateDiagram`.
-- PlantUML sequence diagrams.
 - A built-in pager as an option instead of `less`.
 - Inline images and a built-in TUI.
 

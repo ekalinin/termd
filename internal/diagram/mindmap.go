@@ -36,12 +36,18 @@ func renderMindmap(src string, width int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return drawTree(title, root, width), nil
+}
+
+// drawTree draws a mindmap tree for an output width, with its title, if
+// any, and a blank line above it.
+func drawTree(title string, root *mindNode, width int) string {
 	var out []string
 	if title != "" {
 		out = append(out, title, "")
 	}
 	out = root.layout(out, "", "", 0, width)
-	return strings.Join(out, "\n"), nil
+	return strings.Join(out, "\n")
 }
 
 // layout appends the lines of n and its children to out. prefix starts the

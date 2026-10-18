@@ -688,6 +688,71 @@ func TestHyperlinks(t *testing.T) {
 	}
 }
 
+func TestGitHubLinks(t *testing.T) {
+	links := Options{Width: 80, Style: style.Options{Hyperlinks: true}}
+	tests := []struct {
+		name, src, url, text string
+	}{
+		{"pull request", "https://github.com/ekalinin/termd/pull/19", "https://github.com/ekalinin/termd/pull/19", "ekalinin/termd#19"},
+		{"issue in angle brackets", "<https://github.com/o/r/issues/3>", "https://github.com/o/r/issues/3", "o/r#3"},
+		{"discussion", "https://github.com/o/r/discussions/7", "https://github.com/o/r/discussions/7", "o/r#7"},
+		{"issue comment", "https://github.com/o/r/issues/12#issuecomment-123", "https://github.com/o/r/issues/12#issuecomment-123", "o/r#12 (comment)"},
+		{"review comment", "https://github.com/o/r/pull/12#discussion_r456", "https://github.com/o/r/pull/12#discussion_r456", "o/r#12 (comment)"},
+		{"discussion comment", "https://github.com/o/r/discussions/12#discussioncomment-789", "https://github.com/o/r/discussions/12#discussioncomment-789", "o/r#12 (comment)"},
+		{"review", "https://github.com/o/r/pull/12#pullrequestreview-5", "https://github.com/o/r/pull/12#pullrequestreview-5", "o/r#12 (review)"},
+		{"commit", "https://github.com/o/r/commit/0123456789abcdef0123456789abcdef01234567", "https://github.com/o/r/commit/0123456789abcdef0123456789abcdef01234567", "o/r@0123456"},
+		{"pull request commit", "https://github.com/o/r/pull/12/commits/abcdef1234567", "https://github.com/o/r/pull/12/commits/abcdef1234567", "o/r@abcdef1"},
+		{"repository with a dot", "https://github.com/vercel/next.js/pull/12", "https://github.com/vercel/next.js/pull/12", "vercel/next.js#12"},
+		{"scheme and host case", "http://GitHub.com/o/r/issues/2", "http://GitHub.com/o/r/issues/2", "o/r#2"},
+		{"own text", "[PR](https://github.com/o/r/pull/1)", "https://github.com/o/r/pull/1", "PR"},
+		{"own text equal to the url", "[https://github.com/o/r/pull/1](https://github.com/o/r/pull/1)", "https://github.com/o/r/pull/1", "https://github.com/o/r/pull/1"},
+	}
+	for _, url := range []string{
+		"https://github.com/o/r",
+		"https://github.com/o/r/blob/main/README.md",
+		"https://github.com/o/r/pull/12/files",
+		"https://github.com/o/r/pull/12/",
+		"https://github.com/o/r/issues/12?x=1",
+		"https://github.com/o/r/issues/12#top",
+		"https://github.com/o/r/commit/abc12",
+		"https://www.github.com/o/r/issues/1",
+		"https://gitlab.com/o/r/-/issues/1",
+	} {
+		tests = append(tests, struct{ name, src, url, text string }{"not shortened " + url, url, url, url})
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want := "\x1b]8;;" + tt.url + "\x1b\\" + tt.text + "\x1b]8;;\x1b\\\n"
+			if got := Render([]byte(tt.src+"\n"), links); got != want {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		})
+	}
+	t.Run("width", func(t *testing.T) {
+		out := Render([]byte("https://github.com/ekalinin/termd/pull/19\n"), links)
+		if w := text.Width(stripEscapes(strings.TrimSpace(out))); w != 17 {
+			t.Errorf("width = %d, want 17", w)
+		}
+	})
+	t.Run("plain", func(t *testing.T) {
+		const url = "https://github.com/ekalinin/termd/pull/19"
+		if got := Render([]byte(url+"\n"), plain(80)); got != url+"\n" {
+			t.Errorf("got %q, want %q", got, url+"\n")
+		}
+	})
+	t.Run("table", func(t *testing.T) {
+		const url = "https://github.com/o/r/pull/12"
+		table := func(cell string) string { return "| PR | Note |\n|---|---|\n| " + cell + " | x |\n" }
+		got := stripEscapes(Render([]byte(table(url)), links))
+		if want := Render([]byte(table("o/r#12")), plain(80)); got != want {
+			t.Errorf("with hyperlinks got\n%s\nwant\n%s", got, want)
+		}
+		if got := Render([]byte(table(url)), plain(80)); !strings.Contains(got, url) {
+			t.Errorf("plain table has no %s:\n%s", url, got)
+		}
+	})
+}
+
 func TestResolveLink(t *testing.T) {
 	const dir, host = "/home/u/proj", "box"
 	tests := []struct {

@@ -1,0 +1,29 @@
+# GitHub autolinks
+
+Fixed in https://github.com/ekalinin/termd/pull/19, reported in
+https://github.com/ekalinin/termd/issues/3 and discussed in
+https://github.com/o/r/discussions/7, a long paragraph that wraps at every width
+of the golden files.
+
+• Comment: https://github.com/o/r/issues/12#issuecomment-123
+• Review comment: https://github.com/o/r/pull/12#discussion_r456
+• Discussion comment:
+  https://github.com/o/r/discussions/12#discussioncomment-789
+• Review: https://github.com/o/r/pull/12#pullrequestreview-5
+• Commit: https://github.com/o/r/commit/0123456789abcdef0123456789abcdef01234567
+• Commit of a pull request: https://github.com/o/r/pull/12/commits/abcdef1234567
+• Repository with a dot: https://github.com/vercel/next.js/pull/12
+
+PR                                        │ Change
+──────────────────────────────────────────┼─────────
+https://github.com/ekalinin/termd/pull/30 │ PlantUML
+https://github.com/ekalinin/termd/pull/28 │ Mindmaps
+
+## Stays as written
+
+• https://github.com/ekalinin/termd
+• https://github.com/o/r/pull/12/files
+• https://github.com/o/r/issues/12?x=1
+• https://github.com/o/r/commit/abc12
+• https://gitlab.com/o/r/-/issues/1
+• the pull request (https://github.com/ekalinin/termd/pull/19)

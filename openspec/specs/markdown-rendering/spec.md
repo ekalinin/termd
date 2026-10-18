@@ -130,6 +130,15 @@ When the document is read from a file and hyperlinks are enabled, termd SHALL re
 
 termd SHALL write a destination into the hyperlink as written in the document when it has a scheme (`https:`, `mailto:` and any other), when it is fragment-only (`#section`), when it starts with `/` (including `//host/path`), when it is empty, and when it is not a valid URL reference. When the document is read from stdin, or when hyperlinks are disabled, termd SHALL NOT resolve any destination.
 
+When hyperlinks are enabled, termd SHALL show an autolink, a bare URL or a URL in `<` and `>`, to an issue, a pull request, a discussion or a commit on GitHub with a short text, and its hyperlink SHALL be the full URL. Such a URL SHALL consist of `https://github.com/` or `http://github.com/`, with the scheme and the host in any case, `owner/repo` and one of these endings, where `N` is a number and `SHA` is 7 to 40 hexadecimal digits:
+
+- `/issues/N`, `/pull/N` and `/discussions/N`: the text is `owner/repo#N`;
+- the same endings followed by `#issuecomment-`, `#discussion_r` or `#discussioncomment-` and digits: the text is `owner/repo#N (comment)`;
+- `/pull/N#pullrequestreview-` followed by digits: the text is `owner/repo#N (review)`;
+- `/commit/SHA` and `/pull/N/commits/SHA`: the text is `owner/repo@` followed by the first 7 characters of `SHA`.
+
+The owner SHALL consist of ASCII letters, digits, `-` and `_`, the repository of ASCII letters, digits, `-`, `_` and `.`, and both SHALL be shown as written. termd SHALL show any other autolink as its URL, including a URL of another host or of `www.github.com`, a URL with a query, a trailing `/` or another fragment, and a URL of another GitHub page. A link with its own text, such as `[text](url)`, SHALL keep its text. When hyperlinks are disabled, termd SHALL show the full URL of every autolink.
+
 #### Scenario: Link in a terminal
 - **WHEN** a document contains `[docs](https://example.com/very/long/path)` and hyperlinks are enabled
 - **THEN** the visible output is `docs`, it opens `https://example.com/very/long/path` when clicked, and it occupies 4 columns
@@ -189,6 +198,46 @@ termd SHALL write a destination into the hyperlink as written in the document wh
 #### Scenario: Windows
 - **WHEN** termd runs on Windows and the file `C:\proj\README.md` contains `[guide](docs/guide.md)`
 - **THEN** the hyperlink of `guide` is `file:///C:/proj/docs/guide.md`
+
+#### Scenario: GitHub pull request
+- **WHEN** a document contains the bare URL `https://github.com/ekalinin/termd/pull/19` and hyperlinks are enabled
+- **THEN** the visible output is `ekalinin/termd#19`, it opens `https://github.com/ekalinin/termd/pull/19` when clicked, and it occupies 17 columns
+
+#### Scenario: GitHub issue and discussion
+- **WHEN** a document contains `<https://github.com/o/r/issues/3>` and `https://github.com/o/r/discussions/7` and hyperlinks are enabled
+- **THEN** the visible output is `o/r#3` and `o/r#7`, and they open their full URLs
+
+#### Scenario: GitHub comment and review
+- **WHEN** a document contains the bare URLs `https://github.com/o/r/issues/12#issuecomment-123`, `https://github.com/o/r/pull/12#discussion_r456`, `https://github.com/o/r/discussions/12#discussioncomment-789` and `https://github.com/o/r/pull/12#pullrequestreview-5` and hyperlinks are enabled
+- **THEN** the first three are shown as `o/r#12 (comment)` and the last one as `o/r#12 (review)`
+
+#### Scenario: GitHub commit
+- **WHEN** a document contains the bare URLs `https://github.com/o/r/commit/0123456789abcdef0123456789abcdef01234567` and `https://github.com/o/r/pull/12/commits/abcdef1234567` and hyperlinks are enabled
+- **THEN** they are shown as `o/r@0123456` and `o/r@abcdef1`
+
+#### Scenario: Repository with a dot
+- **WHEN** a document contains the bare URL `https://github.com/vercel/next.js/pull/12` and hyperlinks are enabled
+- **THEN** it is shown as `vercel/next.js#12`
+
+#### Scenario: Scheme and host case
+- **WHEN** a document contains the bare URL `http://GitHub.com/o/r/issues/2` and hyperlinks are enabled
+- **THEN** it is shown as `o/r#2` and opens `http://GitHub.com/o/r/issues/2`
+
+#### Scenario: Autolinks that are not shortened
+- **WHEN** a document contains the bare URLs `https://github.com/o/r`, `https://github.com/o/r/blob/main/README.md`, `https://github.com/o/r/pull/12/files`, `https://github.com/o/r/pull/12/`, `https://github.com/o/r/issues/12?x=1`, `https://github.com/o/r/issues/12#top`, `https://github.com/o/r/commit/abc12`, `https://www.github.com/o/r/issues/1` and `https://gitlab.com/o/r/-/issues/1` and hyperlinks are enabled
+- **THEN** each of them is shown as its URL
+
+#### Scenario: GitHub link with its own text
+- **WHEN** a document contains `[PR](https://github.com/o/r/pull/1)` and `[https://github.com/o/r/pull/1](https://github.com/o/r/pull/1)` and hyperlinks are enabled
+- **THEN** the visible output is `PR` and `https://github.com/o/r/pull/1`
+
+#### Scenario: GitHub autolink in a table
+- **WHEN** a table has the header `PR` and the cell `https://github.com/o/r/pull/12` in one column and hyperlinks are enabled
+- **THEN** the cell shows `o/r#12` and the column is 6 columns wide
+
+#### Scenario: GitHub autolink in a pipe
+- **WHEN** a document contains the bare URL `https://github.com/ekalinin/termd/pull/19` and hyperlinks are disabled
+- **THEN** the output contains `https://github.com/ekalinin/termd/pull/19` once and does not contain `ekalinin/termd#19`
 
 ### Requirement: Images and raw HTML
 termd SHALL render an image as its alt text in the form `[image: alt]`, or as `[image]` when the alt text is empty or consists of whitespace only, linked to the image URL under the same rules as hyperlinks. termd SHALL render raw HTML blocks and inline HTML according to the HTML mode: in the mode `render`, the default, termd SHALL interpret their tags as described in "HTML tags"; in the mode `source`, termd SHALL render them as their source text.

@@ -548,6 +548,13 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 				url = "mailto:" + url
 			}
 		}
+		// With hyperlinks, a GitHub URL is shown the way GitHub shows it;
+		// the hyperlink keeps the full URL.
+		if hyperlinks && n.AutoLinkType == ast.AutoLinkURL {
+			if short, ok := githubText(url); ok {
+				label = short
+			}
+		}
 		return text.LinkSpans([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, url, hyperlinks)
 	case *ast.Image:
 		return r.image(r.plainText(n, false), r.destination(n.Destination), st)

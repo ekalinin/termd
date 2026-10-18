@@ -1,0 +1,26 @@
+[1m# GitHub autolinks[0m
+
+Fixed in ]8;;https://github.com/ekalinin/termd/pull/19\[4;34mekalinin/termd#19[0m]8;;\, reported in ]8;;https://github.com/ekalinin/termd/issues/3\[4;34mekalinin/termd#3[0m]8;;\ and discussed in ]8;;https://github.com/o/r/discussions/7\[4;34mo/r#7[0m]8;;\,
+a long paragraph that wraps at every width of the golden files.
+
+[2m• [0mComment: ]8;;https://github.com/o/r/issues/12#issuecomment-123\[4;34mo/r#12 (comment)[0m]8;;\
+[2m• [0mReview comment: ]8;;https://github.com/o/r/pull/12#discussion_r456\[4;34mo/r#12 (comment)[0m]8;;\
+[2m• [0mDiscussion comment: ]8;;https://github.com/o/r/discussions/12#discussioncomment-789\[4;34mo/r#12 (comment)[0m]8;;\
+[2m• [0mReview: ]8;;https://github.com/o/r/pull/12#pullrequestreview-5\[4;34mo/r#12 (review)[0m]8;;\
+[2m• [0mCommit: ]8;;https://github.com/o/r/commit/0123456789abcdef0123456789abcdef01234567\[4;34mo/r@0123456[0m]8;;\
+[2m• [0mCommit of a pull request: ]8;;https://github.com/o/r/pull/12/commits/abcdef1234567\[4;34mo/r@abcdef1[0m]8;;\
+[2m• [0mRepository with a dot: ]8;;https://github.com/vercel/next.js/pull/12\[4;34mvercel/next.js#12[0m]8;;\
+
+[1mPR[0m                │ [1mChange[0m
+──────────────────┼─────────
+]8;;https://github.com/ekalinin/termd/pull/30\[4;34mekalinin/termd#30[0m]8;;\ │ PlantUML
+]8;;https://github.com/ekalinin/termd/pull/28\[4;34mekalinin/termd#28[0m]8;;\ │ Mindmaps
+
+[1m## Stays as written[0m
+
+[2m• [0m]8;;https://github.com/ekalinin/termd\[4;34mhttps://github.com/ekalinin/termd[0m]8;;\
+[2m• [0m]8;;https://github.com/o/r/pull/12/files\[4;34mhttps://github.com/o/r/pull/12/files[0m]8;;\
+[2m• [0m]8;;https://github.com/o/r/issues/12?x=1\[4;34mhttps://github.com/o/r/issues/12?x=1[0m]8;;\
+[2m• [0m]8;;https://github.com/o/r/commit/abc12\[4;34mhttps://github.com/o/r/commit/abc12[0m]8;;\
+[2m• [0m]8;;https://gitlab.com/o/r/-/issues/1\[4;34mhttps://gitlab.com/o/r/-/issues/1[0m]8;;\
+[2m• [0m]8;;https://github.com/ekalinin/termd/pull/19\[4;34mthe pull request[0m]8;;\

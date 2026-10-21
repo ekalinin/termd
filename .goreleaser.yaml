@@ -33,7 +33,8 @@ checksum:
 
 changelog:
   use: git
-  sort: asc
+  # No sort: entries keep the git log order (newest first). asc and desc sort
+  # them by the commit message.
   groups:
     - title: Features
       regexp: '^feat(\(.+\))?:'

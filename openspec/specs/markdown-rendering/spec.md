@@ -124,7 +124,7 @@ Blocks that cannot be wrapped without losing structure (code blocks, tables that
 - **THEN** each of its lines is output in full, 120 columns wide, without an ellipsis or an inserted line break
 
 ### Requirement: Hyperlinks
-When hyperlinks are enabled, termd SHALL render each link as its visible text wrapped in an OSC 8 terminal hyperlink to the link destination, and SHALL measure only the visible text. When hyperlinks are disabled, termd SHALL render a link as `text (url)`, or as just the URL when the text equals the URL. termd SHALL NOT truncate URLs.
+When hyperlinks are enabled, termd SHALL render each link as its visible text wrapped in an OSC 8 terminal hyperlink to the link destination, and SHALL measure only the visible text. When hyperlinks are disabled, termd SHALL render a link as `text (url)`, or as just the URL when the text equals the URL, except in a table cell, where the URL is listed below the table as described in "Links in cells without hyperlinks" of the table-rendering capability. termd SHALL NOT truncate URLs.
 
 When the document is read from a file and hyperlinks are enabled, termd SHALL resolve a relative destination of a link or an image against the directory of that file and write it into the hyperlink as an absolute `file:` URL. A relative destination is a destination without a scheme that has a path and does not start with `/`, for example `docs/guide.md`, `./a.md` or `../b.md`. The URL SHALL consist of `file://`, the host name of the machine, the absolute path of the target with the `.` and `..` segments resolved, and the fragment of the destination, if any; the query of the destination SHALL be dropped. Backslash escapes, character references and percent-encoded characters of the destination SHALL be decoded, and every character that a URL does not allow in a path, such as a space or a non-ASCII character, SHALL be percent-encoded, so that no character is encoded twice. When the host name of the machine cannot be determined, and on Windows, the host SHALL be empty.
 
@@ -137,7 +137,7 @@ When hyperlinks are enabled, termd SHALL show an autolink, a bare URL or a URL i
 - `/pull/N#pullrequestreview-` followed by digits: the text is `owner/repo#N (review)`;
 - `/commit/SHA` and `/pull/N/commits/SHA`: the text is `owner/repo@` followed by the first 7 characters of `SHA`.
 
-The owner SHALL consist of ASCII letters, digits, `-` and `_`, the repository of ASCII letters, digits, `-`, `_` and `.`, and both SHALL be shown as written. termd SHALL show any other autolink as its URL, including a URL of another host or of `www.github.com`, a URL with a query, a trailing `/` or another fragment, and a URL of another GitHub page. A link with its own text, such as `[text](url)`, SHALL keep its text. When hyperlinks are disabled, termd SHALL show the full URL of every autolink.
+The owner SHALL consist of ASCII letters, digits, `-` and `_`, the repository of ASCII letters, digits, `-`, `_` and `.`, and both SHALL be shown as written. termd SHALL show any other autolink as its URL, including a URL of another host or of `www.github.com`, a URL with a query, a trailing `/` or another fragment, and a URL of another GitHub page. A link with its own text, such as `[text](url)`, SHALL keep its text. When hyperlinks are disabled, termd SHALL show the full URL of every autolink outside table cells; in a table cell, the full URL SHALL be listed below the table.
 
 #### Scenario: Link in a terminal
 - **WHEN** a document contains `[docs](https://example.com/very/long/path)` and hyperlinks are enabled
@@ -238,6 +238,10 @@ The owner SHALL consist of ASCII letters, digits, `-` and `_`, the repository of
 #### Scenario: GitHub autolink in a pipe
 - **WHEN** a document contains the bare URL `https://github.com/ekalinin/termd/pull/19` and hyperlinks are disabled
 - **THEN** the output contains `https://github.com/ekalinin/termd/pull/19` once and does not contain `ekalinin/termd#19`
+
+#### Scenario: Link in a table in a pipe
+- **WHEN** a table cell contains `[docs](https://example.com/very/long/path)`, a paragraph contains the same link, and hyperlinks are disabled
+- **THEN** the cell shows `docs [1]`, the line `[1] https://example.com/very/long/path` follows the table, and the paragraph shows `docs (https://example.com/very/long/path)`
 
 ### Requirement: Images and raw HTML
 termd SHALL render an image as its alt text in the form `[image: alt]`, or as `[image]` when the alt text is empty or consists of whitespace only, linked to the image URL under the same rules as hyperlinks. termd SHALL render raw HTML blocks and inline HTML according to the HTML mode: in the mode `render`, the default, termd SHALL interpret their tags as described in "HTML tags"; in the mode `source`, termd SHALL render them as their source text.

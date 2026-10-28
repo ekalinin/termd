@@ -142,6 +142,8 @@ With hyperlinks enabled, a link shows only its text and opens its destination wh
 
 With hyperlinks enabled, a bare URL or a URL in `<` and `>` of a GitHub issue, pull request, discussion or commit is shown the way GitHub shows it, and a click opens the full URL: `https://github.com/ekalinin/termd/pull/19` as `ekalinin/termd#19`, a link to a comment (`#issuecomment-...`, `#discussion_r...`, `#discussioncomment-...`) as `owner/repo#N (comment)`, a link to a review (`#pullrequestreview-...`) as `owner/repo#N (review)`, and a commit (`/commit/SHA`, `/pull/N/commits/SHA`) as `owner/repo@` and the first 7 characters of the SHA. Links with their own text, other hosts and other GitHub pages, such as repositories and files, are shown as written. With hyperlinks disabled, the URL is shown in full.
 
+With hyperlinks disabled, a link or an image in a table cell shows its text and a marker such as `[1]` instead of the URL, so a long URL does not widen its column. The URLs are listed below the table after a blank line, one per line, as `[1] https://...`; links with the same URL share a marker, and every table starts from `[1]`. A bare URL in a cell is shown as its GitHub text, such as `ekalinin/termd#19`, or else as its host, such as `example.com`. An email address stays in the cell as written.
+
 When the document is read from a file, relative destinations of links and images, such as `docs/guide.md` or `../img/arch.png`, are resolved against the directory of the file and become `file://` URLs with the host name of the machine, for example `file://myhost/home/me/project/docs/guide.md`, so a click opens the target with the default application of the system. The fragment of a destination (`guide.md#setup`) is kept, its query (`logo.png?raw=true`) is dropped. Absolute URLs, `#section` links and destinations that start with `/` are left as written; GitHub reads `/docs/x.md` as relative to the repository root, which termd does not know. A document read from stdin has no directory, so its links are left as written too. With hyperlinks disabled, `text (url)` always shows the destination as written in the document.
 
 ### Footnotes
@@ -238,7 +240,6 @@ A block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNIN
 - Emoji inside diagram labels can misalign, because the diagram library measures text by code points.
 - The `box` group frame in sequence diagrams overlaps message lines visually; the diagram stays correct.
 - Terminals disagree on the width of emoji with a variation selector (for example `⚠️`). termd follows Unicode and counts 2 columns; in iTerm2 this matches the "Use Unicode version 9+ widths" setting.
-- In plain mode a long URL is an unbreakable word and can push a table beyond the output width.
 - GNU screen does not support hyperlinks; use `--hyperlinks=never` there.
 - Background detection works on macOS, Linux and the BSDs; elsewhere the dark theme is used unless `--theme` or `TERMD_THEME` is given.
 - TOML (`+++`) frontmatter is rendered as markdown.

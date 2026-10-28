@@ -5,8 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/ekalinin/termd/internal/text"
 )
 
 // localHost returns the host of file URLs: the name of this machine, so a
@@ -28,6 +32,55 @@ func (r *renderer) destination(dest []byte) string {
 		return string(dest)
 	}
 	return resolveLink(string(dest), r.opts.Dir, localHost())
+}
+
+// linkRefs holds the URLs of the reference markers of a table, in the order
+// of their numbers.
+type linkRefs struct {
+	urls []string
+}
+
+// marker returns the number of the marker of dest, adding dest when it is
+// new.
+func (l *linkRefs) marker(dest string) int {
+	if i := slices.Index(l.urls, dest); i >= 0 {
+		return i + 1
+	}
+	l.urls = append(l.urls, dest)
+	return len(l.urls)
+}
+
+// link turns the label of a link to dest into spans. In a table cell without
+// hyperlinks, the label is followed by a reference marker instead of the URL,
+// and a bare link, which is bare or has a label that reads as dest, shows a
+// short text instead of the URL; elsewhere the spans are those of
+// text.LinkSpans.
+func (r *renderer) link(label []text.Span, dest string, bare bool) []text.Span {
+	if r.refs == nil || dest == "" {
+		return text.LinkSpans(label, dest, r.opts.Style.Hyperlinks)
+	}
+	if bare || text.Line(label).String() == dest {
+		short, ok := shortText(dest)
+		if !ok {
+			return label
+		}
+		label = []text.Span{{Text: short, Style: label[0].Style}}
+	}
+	return append(slices.Clip(label), text.Span{Text: " [" + strconv.Itoa(r.refs.marker(dest)) + "]"})
+}
+
+// shortText returns the text of a bare link to dest in a table cell: the
+// GitHub text of the URL, or else its host. It returns false for a URL
+// without a host.
+func shortText(dest string) (string, bool) {
+	if s, ok := githubText(dest); ok {
+		return s, true
+	}
+	u, err := url.Parse(dest)
+	if err != nil || u.Host == "" {
+		return "", false
+	}
+	return u.Host, true
 }
 
 // htmlDestination returns the URL of an href or src attribute, which the

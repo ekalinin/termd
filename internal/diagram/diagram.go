@@ -133,6 +133,8 @@ func Render(lang, src string, width int) Result {
 		out, err = renderFlowchart(src, width)
 	case "mindmap":
 		out, err = renderMindmap(src, width)
+	case "gantt":
+		out, err = renderGantt(src, width)
 	case "":
 		return fallback(src, width, lang, "no diagram type")
 	default:

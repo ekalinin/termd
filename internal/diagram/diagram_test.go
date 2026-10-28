@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	mdiagram "github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	mrender "github.com/AlexanderGrooff/mermaid-ascii/pkg/render"
@@ -86,7 +87,7 @@ func TestGolden(t *testing.T) {
 }
 
 func TestSupportedTypesAreRendered(t *testing.T) {
-	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd", "mindmap.mmd", "plantuml.puml", "plantuml-seq.puml", "plantuml-mindmap.puml"} {
+	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd", "mindmap.mmd", "gantt.mmd", "gantt-basic.mmd", "plantuml.puml", "plantuml-seq.puml", "plantuml-mindmap.puml"} {
 		lang := "mermaid"
 		if filepath.Ext(name) == ".puml" {
 			lang = "plantuml"
@@ -483,4 +484,302 @@ func TestWideSequenceDiagram(t *testing.T) {
 	if !res.Wide || res.Fallback || width(res) <= 80 {
 		t.Errorf("wide=%v fallback=%v width=%d", res.Wide, res.Fallback, width(res))
 	}
+}
+
+// at parses a UTC time written as 2006-01-02, 2006-01-02 15:04 or
+// 2006-01-02 15:04:05.
+func at(t *testing.T, s string) time.Time {
+	t.Helper()
+	for _, layout := range []string{time.DateOnly, "2006-01-02 15:04", time.DateTime} {
+		if v, err := time.Parse(layout, s); err == nil {
+			return v
+		}
+	}
+	t.Fatalf("bad time %q", s)
+	return time.Time{}
+}
+
+func TestGanttDates(t *testing.T) {
+	// Every task is "start, end", or "start, end, bar" when its bar ends
+	// before its end.
+	tests := []struct {
+		name  string
+		src   string
+		tasks []string
+	}{
+		{"task without a start", "A :a, 2024-01-01, 10d\nB :10d", []string{"2024-01-01, 2024-01-11", "2024-01-11, 2024-01-21"}},
+		{"after several tasks", "A :a, 2024-01-01, 5d\nB :b, 2024-01-01, 10d\nC :after a b, 10d", []string{"2024-01-01, 2024-01-06", "2024-01-01, 2024-01-11", "2024-01-11, 2024-01-21"}},
+		{"until a later task", "A :a, 2024-01-01, until b\nB :b, 2024-01-11, 10d", []string{"2024-01-01, 2024-01-11", "2024-01-11, 2024-01-21"}},
+		{"until the earliest task", "A :2024-01-01, until b c\nB :b, 2024-01-10, 1d\nC :c, 2024-01-05, 1d", []string{"2024-01-01, 2024-01-05", "2024-01-10, 2024-01-11", "2024-01-05, 2024-01-06"}},
+		{"weeks", "A :2024-01-01, 1w", []string{"2024-01-01, 2024-01-08"}},
+		{"days rounded", "A :2024-01-01, 1.5d", []string{"2024-01-01, 2024-01-03"}},
+		{"month to a shorter month", "A :2024-01-31, 1M", []string{"2024-01-31, 2024-02-29"}},
+		{"fraction of a month", "A :2024-01-31, 1.5M", []string{"2024-01-31, 2024-02-29"}},
+		{"year from a leap day", "A :2024-02-29, 1y", []string{"2024-02-29, 2025-02-28"}},
+		{"hours", "A :2024-01-01, 36h", []string{"2024-01-01, 2024-01-02 12:00"}},
+		{"minutes, seconds and milliseconds", "A :a, 2024-01-01, 90m\nB :30s\nC :1500ms", []string{"2024-01-01, 2024-01-01 01:30", "2024-01-01 01:30, 2024-01-01 01:30:30", "2024-01-01 01:30:30, 2024-01-01 01:30:31.5"}},
+		{"times", "dateFormat HH:mm\nA :a, 17:49, 10m\nB :5m", []string{"1970-01-01 17:49, 1970-01-01 17:59", "1970-01-01 17:59, 1970-01-01 18:04"}},
+		{"unix seconds", "dateFormat X\nA :0, 71", []string{"1970-01-01, 1970-01-01 00:01:11"}},
+		{"unix milliseconds", "dateFormat x\nA :1000, 3000", []string{"1970-01-01 00:00:01, 1970-01-01 00:00:03"}},
+		{"dateFormat after the tasks", "A :01.02.2024, 1d\ndateFormat DD.MM.YYYY", []string{"2024-02-01, 2024-02-02"}},
+		{"short tokens", "dateFormat D/M/YY\nA :a, 5/1/24, 1d\nB :b, 1/1/69, 1d\nC :12/11/68, 1d", []string{"2024-01-05, 2024-01-06", "1969-01-01, 1969-01-02", "2068-11-12, 2068-11-13"}},
+		{"end date", "A :2024-01-01, 2024-01-10", []string{"2024-01-01, 2024-01-10"}},
+		{"inclusive end dates", "inclusiveEndDates\nA :2024-01-01, 2024-01-10", []string{"2024-01-01, 2024-01-11"}},
+		{"invalid end", "A :2024-01-01, 3dX", []string{"2024-01-01, 2024-01-01"}},
+		{"excluded weekend", "excludes weekends\nA :a, 2024-01-01, 5d\nB :after a, 1d", []string{"2024-01-01, 2024-01-08, 2024-01-06", "2024-01-08, 2024-01-09"}},
+		{"weekend in the middle", "excludes weekends\nA :2024-01-05, 2d", []string{"2024-01-05, 2024-01-09"}},
+		{"included day", "excludes weekends\nincludes 2024-01-06\nA :2024-01-01, 6d", []string{"2024-01-01, 2024-01-08, 2024-01-07"}},
+		{"weekend friday", "excludes weekends\nweekend friday\nA :2024-01-01, 5d", []string{"2024-01-01, 2024-01-08"}},
+		{"weekday name", "excludes Sunday\nA :2024-01-06, 2d", []string{"2024-01-06, 2024-01-09"}},
+		{"excluded dates", "dateFormat DD.MM.YYYY\nexcludes 02.01.2024, 2024-01-03\nA :01.01.2024, 2d", []string{"2024-01-01, 2024-01-05"}},
+		{"end date not moved", "excludes weekends\nA :2024-01-01, 2024-01-07", []string{"2024-01-01, 2024-01-07"}},
+		{"until not moved", "excludes weekends\nA :2024-01-01, until b\nB :b, 2024-01-06, 1d", []string{"2024-01-01, 2024-01-06", "2024-01-06, 2024-01-08, 2024-01-07"}},
+		{"vert task before the next one", "A :a, 2024-01-01, 2d\nV :vert, 2024-01-05, 1d\nB :1d", []string{"2024-01-01, 2024-01-03", "2024-01-05, 2024-01-06", "2024-01-06, 2024-01-07"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := parseGantt("gantt\n" + tt.src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(c.tasks) != len(tt.tasks) {
+				t.Fatalf("got %d tasks, want %d", len(c.tasks), len(tt.tasks))
+			}
+			for i, want := range tt.tasks {
+				var ts []time.Time
+				for s := range strings.SplitSeq(want, ", ") {
+					ts = append(ts, at(t, s))
+				}
+				if len(ts) == 2 {
+					ts = append(ts, ts[1])
+				}
+				got := c.tasks[i]
+				if !got.start.Equal(ts[0]) || !got.end.Equal(ts[1]) || !got.bar.Equal(ts[2]) {
+					t.Errorf("task %d: got %v, %v, %v, want %v, %v, %v", i, got.start, got.end, got.bar, ts[0], ts[1], ts[2])
+				}
+			}
+		})
+	}
+	errs := []struct{ name, src, reason string }{
+		{"unsupported line", "gantt\ndateFormat YYYY-MM-DD\nA 2024-01-01, 3d", "unsupported line 3"},
+		{"only tags", "gantt\nA :done, crit", "unsupported line 2"},
+		{"no items", "gantt\nA :", "unsupported line 2"},
+		{"too many items", "gantt\nA :a, 2024-01-01, 3d, x", "unsupported line 2"},
+		{"unknown weekend", "gantt\nweekend monday\nA :2024-01-01, 1d", "unsupported line 2"},
+		{"invalid date", "gantt\nA :2024-13-01, 3d", "invalid date on line 2"},
+		{"no such day", "gantt\nA :2024-02-30, 3d", "invalid date on line 2"},
+		{"line in frontmatter numbering", "---\ntitle: x\n---\ngantt\nA :1 Jan, 3d", "invalid date on line 5"},
+		{"unsupported dateFormat", "gantt\ndateFormat MMM D YYYY\nA :Jan 1 2024, 3d", "unsupported dateFormat"},
+		{"timestamp inside a format", "gantt\ndateFormat X.SSS\nA :1.000, 3d", "unsupported dateFormat"},
+		{"no start date", "gantt\nA :3d", "no start date on line 2"},
+		{"unknown task in after", "gantt\nA :after x, 3d", "unknown task x"},
+		{"unknown task in until", "gantt\nA :2024-01-01, until y", "unknown task y"},
+		{"circular dependency", "gantt\nA :a, after b, 1d\nB :b, after a, 1d", "circular dependency"},
+		{"no tasks", "gantt\ntitle Plan", "no tasks"},
+		{"only a vert task", "gantt\nV :vert, 2024-01-01, 1d", "no tasks"},
+		{"every day excluded", "gantt\nexcludes weekends monday tuesday wednesday thursday friday\nA :2024-01-01, 1d", "every day is excluded"},
+	}
+	for _, tt := range errs {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := parseGantt(tt.src); err == nil || err.Error() != tt.reason {
+				t.Errorf("got error %v, want %q", err, tt.reason)
+			}
+		})
+	}
+}
+
+func TestGantt(t *testing.T) {
+	sp, full := func(n int) string { return strings.Repeat(" ", n) }, func(n int) string { return strings.Repeat("█", n) }
+	tests := []struct {
+		name  string
+		src   string
+		width int
+		want  []string
+	}{
+		{
+			"bars",
+			"gantt\n  dateFormat YYYY-MM-DD\n  section Build\n    Design :d, 2024-01-01, 10d\n    Code :after d, 10d",
+			40,
+			[]string{sp(10) + "2024-01-01" + sp(10) + "2024-01-21", "Build", "  Design  " + full(15), "  Code" + sp(19) + full(15)},
+		},
+		{
+			"title line over frontmatter",
+			"---\ntitle: Old\n---\ngantt\n  title Plan\n  A :2024-01-01, 20d",
+			40,
+			[]string{"Plan", "", sp(3) + "2024-01-01" + sp(17) + "2024-01-21", "A  " + full(37)},
+		},
+		{
+			"frontmatter title",
+			"---\ntitle: Ideas\n---\ngantt\n  A :2024-01-01, 20d",
+			40,
+			[]string{"Ideas", "", sp(3) + "2024-01-01" + sp(17) + "2024-01-21", "A  " + full(37)},
+		},
+		{
+			"task states",
+			"gantt\n  Design :done, d, 2024-01-01, 10d\n  Build :active, b, after d, 10d\n  Test :t, after b, 10d\n  Fix :crit, f, after t, 10d\n  Release :milestone, after f, 0d",
+			40,
+			[]string{
+				sp(9) + "2024-01-01" + sp(11) + "2024-02-10",
+				"Design   " + strings.Repeat("░", 8),
+				"Build    " + sp(8) + strings.Repeat("▓", 8),
+				"Test     " + sp(16) + full(7),
+				"Fix      " + sp(23) + full(8),
+				"Release  " + sp(30) + "◆",
+			},
+		},
+		{
+			"active wins over done",
+			"gantt\n  A :done, active, 2024-01-01, 20d",
+			40,
+			[]string{sp(3) + "2024-01-01" + sp(17) + "2024-01-21", "A  " + strings.Repeat("▓", 37)},
+		},
+		{
+			"tasks without a section",
+			"gantt\n  Kickoff :k, 2024-01-01, 1d\n  section Work\n  Build :after k, 5d",
+			40,
+			[]string{sp(9) + "2024-01-01" + sp(11) + "2024-01-07", "Kickoff  " + full(5), "Work", "  Build  " + sp(5) + full(26)},
+		},
+		{
+			"vertical marker",
+			"gantt\n  A :a, 2024-01-01, 10d\n  Deadline :vert, 2024-01-05, 0d",
+			40,
+			[]string{sp(3) + "2024-01-01" + sp(17) + "2024-01-11", "A  " + full(37)},
+		},
+		{
+			"section of vertical markers",
+			"gantt\n  A :a, 2024-01-01, 10d\n  section Marks\n  Deadline :vert, 2024-01-05, 0d",
+			40,
+			[]string{sp(3) + "2024-01-01" + sp(17) + "2024-01-11", "A  " + full(37)},
+		},
+		{
+			"milestone in the middle of its duration",
+			"gantt\n  A :a, 2024-01-01, 10d\n  M :milestone, 2024-01-05, 2d",
+			40,
+			[]string{sp(3) + "2024-01-01" + sp(17) + "2024-01-11", "A  " + full(37), "M  " + sp(19) + "◆"},
+		},
+		{
+			"chart of one instant",
+			"gantt\n  M :milestone, 2024-01-05, 0d",
+			40,
+			[]string{sp(3) + "2024-01-05" + sp(17) + "2024-01-05", "M  ◆"},
+		},
+		{
+			"bar at the end of the chart",
+			"gantt\n  A :a, 2024-01-01, 10d\n  B :0d",
+			40,
+			[]string{sp(3) + "2024-01-01" + sp(17) + "2024-01-11", "A  " + full(37), "B  " + sp(36) + full(1)},
+		},
+		{
+			"excluded weekend between bars",
+			"gantt\n  excludes weekends\n  A :a, 2024-01-01, 5d\n  B :after a, 1d",
+			40,
+			// 37 columns for 8 days: Saturday 2024-01-06 is column 23,
+			// Monday 2024-01-08 column 32.
+			[]string{sp(3) + "2024-01-01" + sp(17) + "2024-01-09", "A  " + full(23), "B  " + sp(32) + full(5)},
+		},
+		{
+			"axis format",
+			"gantt\n  axisFormat %-d %b\n  A :2024-01-01, 20d",
+			40,
+			[]string{sp(3) + "1 Jan" + sp(26) + "21 Jan", "A  " + full(37)},
+		},
+		{
+			"axis with only the start",
+			"gantt\n  axisFormat %Y-%m-%dT%H:%M\n  A :2024-01-01, 5d",
+			30,
+			[]string{sp(3) + "2024-01-01T00:00", "A  " + full(27)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Render("mermaid", tt.src, tt.width)
+			if res.Fallback {
+				t.Fatalf("fell back:\n%s", lines(res))
+			}
+			if got, want := lines(res), strings.Join(tt.want, "\n")+"\n"; got != want {
+				t.Errorf("got\n%s\nwant\n%s", got, want)
+			}
+		})
+	}
+	t.Run("ignored lines", func(t *testing.T) {
+		tasks := "  A :a, 2024-01-01, 10d\n  B :5d"
+		with := "gantt\n  todayMarker off\n  tickInterval 1week\n  weekday monday\n  topAxis\n  accTitle: Plan\n  accDescr: About the plan\n" +
+			"  accDescr {\n    A longer\n    description\n  }\n  click a href \"https://example.com\"\n  %% a comment\n" + tasks
+		got, want := Render("mermaid", with, 40), Render("mermaid", "gantt\n"+tasks, 40)
+		if got.Fallback || lines(got) != lines(want) {
+			t.Errorf("got\n%s\nwant\n%s", lines(got), lines(want))
+		}
+	})
+	t.Run("axis codes", func(t *testing.T) {
+		at := time.Date(2024, time.March, 5, 14, 7, 9, 45e6, time.UTC)
+		f := "%Y %y %m %d %e %H %I %M %S %L %p %a %A %b %B %j %s %% %-m %-H %Q %"
+		want := "2024 24 03 05  5 14 02 07 09 045 PM Tue Tuesday Mar March 065 1709647629 % 3 14 %Q %"
+		if got := formatAxis(at, f); got != want {
+			t.Errorf("got  %q\nwant %q", got, want)
+		}
+	})
+	errs := []struct{ name, src, reason string }{
+		{"unsupported line", "gantt\ndateFormat YYYY-MM-DD\nA 2024-01-01, 3d", "unsupported line 3"},
+		{"invalid date", "gantt\nA :2024-13-01, 3d", "invalid date on line 2"},
+		{"unsupported dateFormat", "gantt\ndateFormat MMM D YYYY\nA :Jan 1 2024, 3d", "unsupported dateFormat"},
+		{"no start date", "gantt\nA :3d", "no start date on line 2"},
+		{"unknown task", "gantt\nA :after x, 3d", "unknown task x"},
+		{"circular dependency", "gantt\nA :a, after b, 1d\nB :b, after a, 1d", "circular dependency"},
+		{"no tasks", "gantt\ntitle Plan", "no tasks"},
+	}
+	for _, tt := range errs {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Render("mermaid", tt.src, 80)
+			if !res.Fallback {
+				t.Fatalf("did not fall back:\n%s", lines(res))
+			}
+			if label, want := res.Lines[0].String(), "mermaid - gantt - "+tt.reason; !strings.Contains(label, want) {
+				t.Errorf("label %q lacks %q", label, want)
+			}
+		})
+	}
+}
+
+func TestGanttWidth(t *testing.T) {
+	full := func(n int) string { return strings.Repeat("█", n) }
+	split := func(res Result) []string { return strings.Split(strings.TrimSuffix(lines(res), "\n"), "\n") }
+	t.Run("long names", func(t *testing.T) {
+		res := Render("mermaid", "gantt\n  section Work\n  Implement the parser and the tests :2024-01-01, 5d", 40)
+		// Two dates do not fit into 20 columns, so the axis has only the
+		// start.
+		want := []string{strings.Repeat(" ", 20) + "2024-01-01", "Work", "  Implement the     " + full(20), "  parser and the", "  tests"}
+		if got := split(res); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+		}
+		if res.Wide || width(res) > 40 {
+			t.Errorf("wider than 40: wide %v, width %d", res.Wide, width(res))
+		}
+	})
+	t.Run("narrow output", func(t *testing.T) {
+		res := Render("mermaid", "gantt\n  section Work\n  Implement the parser :2024-01-01, 5d", 25)
+		got := split(res)
+		if len(got) < 5 || got[2] != "  Implemen  "+full(20) || got[3] != "  t the" || got[4] != "  parser" {
+			t.Errorf("got %q", got)
+		}
+		if !res.Wide {
+			t.Error("not wide")
+		}
+	})
+	t.Run("long word", func(t *testing.T) {
+		res := Render("mermaid", "gantt\n  Supercalifragilisticexpialidocious :a, 2024-01-01, 5d\n  B :after a, 5d", 40)
+		got := split(res)
+		if len(got) != 4 || got[1] != "Supercalifragilist  "+full(10) || got[2] != "icexpialidocious" || got[3] != "B"+strings.Repeat(" ", 29)+full(10) {
+			t.Errorf("got %q", got)
+		}
+	})
+	t.Run("long section name", func(t *testing.T) {
+		res := Render("mermaid", "gantt\n  section A very long section name that does not fit\n  A :2024-01-01, 5d", 30)
+		got := split(res)
+		if len(got) != 4 || got[1] != "A very long section name that" || got[2] != "does not fit" {
+			t.Errorf("got %q", got)
+		}
+		if res.Wide {
+			t.Error("wide")
+		}
+	})
 }

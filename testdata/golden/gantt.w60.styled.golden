@@ -1,0 +1,51 @@
+[1m# Gantt charts[0m
+
+Adding GANTT diagram functionality to mermaid
+
+                                       2014-01-06 2014-01-28
+A section
+  Completed task                       ░░
+  Active task                             ▓▓▓▓▓
+  Future task                                  ██████
+  Future task2                                       ███████
+Critical tasks
+  Completed task in the critical line  ░
+  Implement parser and jison             ░░
+  Create tests for parser                  ▓▓▓▓▓
+  Future task in critical line                  ██████
+  Create tests for renderer                           ██
+  Add to mermaid                                        █
+  Functionality added                                    ◆
+Documentation
+  Describe gantt syntax                  ▓▓▓
+  Add gantt diagram to demo page              █
+  Add another diagram to demo page            ██
+Last section
+  Describe gantt syntax                         ██
+  Add gantt diagram to demo page                    █
+  Add another diagram to demo page                   ██
+
+Release plan
+
+            4 Mar                                     24 Mar
+Build
+  Design    ░░░░░░░░░░░░
+  Code                  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+  Fix bugs                                      ████████████
+Ship
+  Release                                                  ◆
+
+                                        2024-01-01
+Work
+  Implement the parser for the gantt    █████████████████
+  syntax and its tests
+  Review                                                 ███
+
+┌─ mermaid - gantt - unknown task a2 ┐
+│ gantt                              │
+│   A task :a1, 2014-01-01, 30d      │
+│   Another task :after a2, 20d      │
+└────────────────────────────────────┘
+
+The paragraph after the broken gantt chart is rendered
+normally.

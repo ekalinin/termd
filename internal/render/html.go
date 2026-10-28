@@ -184,7 +184,7 @@ func (h *inlineHTML) pop() {
 	t := h.open[len(h.open)-1]
 	h.open = h.open[:len(h.open)-1]
 	if t.link {
-		h.put(text.LinkSpans(t.spans, t.dest, h.r.opts.Style.Hyperlinks)...)
+		h.put(h.r.link(t.spans, t.dest, false)...)
 	}
 }
 

@@ -112,6 +112,9 @@ type renderer struct {
 	pal      theme.Palette
 	theme    highlight.Theme
 	themeSet bool
+	// refs collects the URLs of the links in the cells of a table when
+	// hyperlinks are disabled; it is nil outside tables.
+	refs *linkRefs
 }
 
 // palette returns the palette of the options, theme.Default for a zero one.
@@ -393,7 +396,8 @@ func (r *renderer) quote(n *ast.Blockquote, width int) Block {
 	return b
 }
 
-// table converts a GFM table node and lays it out.
+// table converts a GFM table node and lays it out. Without hyperlinks, the
+// URLs of the links in its cells are listed below it after a blank line.
 func (r *renderer) table(n *east.Table, width int) Block {
 	t := table.Table{HeaderStyle: r.pal.TableHeader, BorderStyle: r.pal.TableBorder}
 	for _, a := range n.Alignments {
@@ -408,6 +412,10 @@ func (r *renderer) table(n *east.Table, width int) Block {
 			t.Align = append(t.Align, table.AlignNone)
 		}
 	}
+	refs := &linkRefs{}
+	if !r.opts.Style.Hyperlinks {
+		r.refs = refs
+	}
 	for row := n.FirstChild(); row != nil; row = row.NextSibling() {
 		var cells []table.Cell
 		for c := row.FirstChild(); c != nil; c = c.NextSibling() {
@@ -419,7 +427,16 @@ func (r *renderer) table(n *east.Table, width int) Block {
 			t.Rows = append(t.Rows, cells)
 		}
 	}
+	r.refs = nil
 	lines, wide := t.Render(width)
+	if len(refs.urls) > 0 {
+		lines = append(lines, text.Line{})
+	}
+	for i, u := range refs.urls {
+		l := text.Plain("[" + strconv.Itoa(i+1) + "] " + u)
+		lines = append(lines, l)
+		wide = wide || l.Width() > width
+	}
 	return Block{Lines: lines, Wide: wide}
 }
 
@@ -537,7 +554,7 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 		ss.Strike = true
 		return r.inlines(n, ss)
 	case *ast.Link:
-		return text.LinkSpans(r.inlines(n, style.Layer(st, r.pal.Link)), r.destination(n.Destination), hyperlinks)
+		return r.link(r.inlines(n, style.Layer(st, r.pal.Link)), r.destination(n.Destination), false)
 	case *ast.AutoLink:
 		label := string(n.Label(r.src))
 		url := string(n.URL(r.src))
@@ -555,7 +572,7 @@ func (r *renderer) inline(n ast.Node, st style.Style) []text.Span {
 				label = short
 			}
 		}
-		return text.LinkSpans([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, url, hyperlinks)
+		return r.link([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, url, n.AutoLinkType == ast.AutoLinkURL)
 	case *ast.Image:
 		return r.image(r.plainText(n, false), r.destination(n.Destination), st)
 	case *ast.RawHTML:
@@ -592,7 +609,7 @@ func (r *renderer) image(alt, dest string, st style.Style) []text.Span {
 	if strings.TrimSpace(alt) != "" {
 		label = "[image: " + alt + "]"
 	}
-	return text.LinkSpans([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, dest, r.opts.Style.Hyperlinks)
+	return r.link([]text.Span{{Text: label, Style: style.Layer(st, r.pal.Link)}}, dest, false)
 }
 
 // plainText collects the text of n's descendants. Raw text (code spans) is

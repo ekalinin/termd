@@ -23,12 +23,15 @@
 
 ## Inline content, emoji, CJK, alignment
 
-Статус │ Имя            │ Ссылка                                                     │ Число
-───────┼────────────────┼────────────────────────────────────────────────────────────┼──────
-  ✅   │ жирный         │ docs                                                       │     1
-       │                │ (https://example.com/very/long/path/to/documentation/page) │
-  ⚠️   │ 日本語テキスト │ code | pipe                                                │  1000
-  👨‍👩‍👧   │ обычный        │ -                                                          │    42
+Статус │ Имя            │ Ссылка │ Число
+───────┼────────────────┼────────┼──────
+  ✅   │ жирный         │ docs   │     1
+       │                │ [1]    │
+  ⚠️   │ 日本語テキスト │ code | │  1000
+       │                │ pipe   │
+  👨‍👩‍👧   │ обычный        │ -      │    42
+
+[1] https://example.com/very/long/path/to/documentation/page
 
 ## Ragged rows
 

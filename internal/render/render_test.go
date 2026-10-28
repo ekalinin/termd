@@ -941,6 +941,103 @@ func TestTableCells(t *testing.T) {
 	}
 }
 
+func TestTableLinks(t *testing.T) {
+	const long = "https://example.com/very/long/path/to/documentation/page"
+	// table builds a markdown table from rows of cells; the first row is the
+	// header.
+	table := func(rows ...string) string {
+		cols := strings.Count(rows[0], "|") + 1
+		return "| " + rows[0] + " |\n|" + strings.Repeat("---|", cols) + "\n| " + strings.Join(rows[1:], " |\n| ") + " |\n"
+	}
+	tests := []struct {
+		name, src string
+		// want is the source of the same table with the cells as they are
+		// shown, rendered with plain(80), followed by the list.
+		want string
+		list []string
+	}{
+		{"link", table("Ссылка", "[docs]("+long+")"), table("Ссылка", "docs [1]"), []string{"[1] " + long}},
+		{
+			"several links",
+			table("[Name](https://n.example) | Logo", "[a](https://a.example) | ![logo](logo.png)", "[b](https://a.example) | x"),
+			table("Name [1] | Logo", "a [2] | [image: logo] [3]", "b [2] | x"),
+			[]string{"[1] https://n.example", "[2] https://a.example", "[3] logo.png"},
+		},
+		{
+			"github autolink",
+			table("PR", "https://github.com/ekalinin/termd/pull/30"),
+			table("PR", "ekalinin/termd#30 [1]"),
+			[]string{"[1] https://github.com/ekalinin/termd/pull/30"},
+		},
+		{
+			"other bare url",
+			table("U | V", "https://example.com/docs/mindmaps | [https://example.com/docs/mindmaps](https://example.com/docs/mindmaps)"),
+			table("U | V", "example.com [1] | example.com [1]"),
+			[]string{"[1] https://example.com/docs/mindmaps"},
+		},
+		{
+			"no host",
+			table("A | B | C", "<me@example.com> | [a.md](a.md) | [empty]()"),
+			table("A | B | C", "`me@example.com` | a.md | empty"),
+			nil,
+		},
+		{
+			"html link",
+			table("A", `<a href="https://example.com/guide">guide</a>`),
+			table("A", "guide [1]"),
+			[]string{"[1] https://example.com/guide"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want := Render([]byte(tt.want), plain(80))
+			if len(tt.list) > 0 {
+				want += "\n" + strings.Join(tt.list, "\n") + "\n"
+			}
+			if got := Render([]byte(tt.src), plain(80)); got != want {
+				t.Errorf("got\n%s\nwant\n%s", got, want)
+			}
+		})
+	}
+	t.Run("every table starts from 1", func(t *testing.T) {
+		src := table("A", "[x](https://x.example)") + "\n" + table("B", "[y](https://y.example)")
+		want := Render([]byte(table("A", "x [1]")), plain(80)) + "\n[1] https://x.example\n\n" +
+			Render([]byte(table("B", "y [1]")), plain(80)) + "\n[1] https://y.example\n"
+		if got := Render([]byte(src), plain(80)); got != want {
+			t.Errorf("got\n%s\nwant\n%s", got, want)
+		}
+	})
+	t.Run("fits the output width", func(t *testing.T) {
+		src := table("Статус | Имя | Ссылка | Число", "✅ | **жирный** | [docs]("+long+") | 1", "⚠️ | 日本語テキスト | x | 1000")
+		lines := renderLines(src, plain(40))
+		if len(lines) < 2 || lines[len(lines)-1] != "[1] "+long || lines[len(lines)-2] != "" {
+			t.Fatalf("no list after the table:\n%s", strings.Join(lines, "\n"))
+		}
+		docs := false
+		for _, l := range lines[:len(lines)-2] {
+			if w := text.Width(l); w > 40 {
+				t.Errorf("table line is %d columns wide: %q", w, l)
+			}
+			docs = docs || strings.Contains(l, "│ docs")
+		}
+		if !docs {
+			t.Errorf("docs is not on one line:\n%s", strings.Join(lines, "\n"))
+		}
+		r := &renderer{src: []byte(src), opts: plain(40), pal: theme.Default}
+		if b, _ := r.block(Parse([]byte(src)).FirstChild(), 40); !b.Wide {
+			t.Error("table with a list line wider than the output is not marked wide")
+		}
+	})
+	t.Run("hyperlinks", func(t *testing.T) {
+		marker := regexp.MustCompile(`\[[0-9]+\]`)
+		for _, tt := range tests {
+			if out := stripEscapes(Render([]byte(tt.src), styled(80))); marker.MatchString(out) {
+				t.Errorf("%s: output with hyperlinks has a marker:\n%s", tt.name, out)
+			}
+		}
+	})
+}
+
 // sameWidth reports whether all lines are equally wide.
 func sameWidth(lines []string) bool {
 	for _, l := range lines {

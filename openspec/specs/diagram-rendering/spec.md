@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how termd detects diagram code blocks and renders them in the terminal: mermaid sequence, flowchart and ER diagrams and PlantUML sequence diagrams are drawn as text, mermaid and PlantUML mindmaps are drawn as indented trees, and every other diagram is shown as its source in a labelled frame instead of failing.
+Defines how termd detects diagram code blocks and renders them in the terminal: mermaid sequence, flowchart and ER diagrams and PlantUML sequence diagrams are drawn as text, mermaid and PlantUML mindmaps are drawn as indented trees, mermaid gantt charts are drawn as bars on a time axis, and every other diagram is shown as its source in a labelled frame instead of failing.
 
 ## Requirements
 

@@ -87,7 +87,7 @@ func TestGolden(t *testing.T) {
 }
 
 func TestSupportedTypesAreRendered(t *testing.T) {
-	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd", "mindmap.mmd", "gantt.mmd", "gantt-basic.mmd", "plantuml.puml", "plantuml-seq.puml", "plantuml-mindmap.puml"} {
+	for _, name := range []string{"seq-notes.mmd", "seq-blocks.mmd", "seq-activation.mmd", "flow-lr.mmd", "flow-td.mmd", "er.mmd", "title.mmd", "mindmap.mmd", "gantt.mmd", "gantt-basic.mmd", "plantuml.puml", "plantuml-seq.puml", "plantuml-mindmap.puml", "state.mmd", "state-composite.mmd", "plantuml-state.puml"} {
 		lang := "mermaid"
 		if filepath.Ext(name) == ".puml" {
 			lang = "plantuml"
@@ -111,7 +111,7 @@ func TestFallbackLabels(t *testing.T) {
 		lang, file string
 		want       []string
 	}{
-		{"mermaid", "state.mmd", []string{"mermaid", "stateDiagram-v2", "not supported"}},
+		{"mermaid", "class.mmd", []string{"mermaid", "classDiagram", "not supported"}},
 		{"plantuml", "plantuml-class.puml", []string{"plantuml", "class", "not supported"}},
 		{"mermaid", "seq-invalid.mmd", []string{"mermaid", "sequenceDiagram", "invalid syntax"}},
 	}
@@ -344,6 +344,72 @@ func TestPlantumlSequence(t *testing.T) {
 	})
 }
 
+func TestPlantumlState(t *testing.T) {
+	puml := func(lines ...string) string { return "@startuml\n" + strings.Join(lines, "\n") + "\n@enduml" }
+	state := func(lines ...string) string { return "stateDiagram-v2\n    " + strings.Join(lines, "\n    ") }
+	tests := []struct {
+		name        string
+		plant, want string
+	}{
+		{
+			"transitions and arrows",
+			puml("[*] --> Idle", "Idle -> Loading : open", "Loading -down-> Ready", "Ready -[#red]-> Done", "Done <- Loading", "Ready -r-> Done", "Done --> [*]"),
+			state("[*] --> Idle", "Idle --> Loading : open", "Loading --> Ready", "Ready --> Done", "Loading --> Done", "Ready --> Done", "Done --> [*]"),
+		},
+		{
+			"declarations",
+			puml(`state "Waiting" as W`, `state L as "Loading data"`, "state X #pink", "W : press a key", "W --> L", "L --> X"),
+			state(`state "Waiting" as W`, `state "Loading data" as L`, "state X", "W : press a key", "W --> L", "L --> X"),
+		},
+		{
+			"composite state with regions",
+			puml("[*] --> Active", "state Active #pink {", "[*] -> A", "||", "[*] -> B", "}"),
+			state("[*] --> Active", "state Active {", "[*] --> A", "--", "[*] --> B", "}"),
+		},
+		{
+			"special states",
+			puml("state s <<start>>", "state c <<choice>>", "state p <<entryPoint>>", "state e <<end>>", "s --> c", "c --> p", "p --> e"),
+			state(`state "●" as s`, "state c <<choice>>", "state p", `state "◉" as e`, "s --> c", "c --> p", "p --> e"),
+		},
+		{
+			"history",
+			puml("state Active {", "[*] --> Running", "Running --> [H]", "}", "Idle --> Active[H]"),
+			state("state Active {", "[*] --> Running", `state "H" as hist`, "Running --> hist", "}", "Idle --> hist"),
+		},
+		{
+			"line breaks",
+			puml(`state "Long\nname" as L`, `L --> M : a\nb`, `note right of L : x\ny`),
+			state(`state "Long<br>name" as L`, "L --> M : a b", "note right of L : x y"),
+		},
+	}
+	for _, tt := range tests {
+		sameRender(t, tt.name, "plantuml", tt.plant, "mermaid", tt.want, 80)
+	}
+
+	got := drawn(t, "plantuml", puml("[*] --> A", "A --> B", "note on link : retry", "note top of A : first", "note bottom of B", "waits", "end note"), 80)
+	if want := drawn(t, "mermaid", state("[*] --> A", "A --> B"), 80) + "\n\nA --> B: retry\nA: first\nB: waits"; got != want {
+		t.Errorf("notes:\n%s\nwant\n%s", got, want)
+	}
+
+	got = drawn(t, "plantuml", puml("title Player", "left to right direction", "skinparam monochrome true", "skinparam state {", "BackgroundColor red", "}",
+		"hide empty description", "show stereotype", "scale 2", "' a comment", "/' a block", "comment '/", "header h", "footer f", "caption c",
+		"legend", "text", "endlegend", "!theme plain", "[*] --> A", "A --> B"), 80)
+	if want := "Player\n\n" + drawn(t, "mermaid", state("direction LR", "[*] --> A", "A --> B"), 80); got != want {
+		t.Errorf("direction, title and ignored lines:\n%s\nwant\n%s", got, want)
+	}
+
+	errors := []struct{ src, want string }{
+		{puml("[*] --> A", `note "free" as N1`), "plantuml - state - unsupported line 3"},
+		{puml("state Active {", "[*] --> Running"), "plantuml - state - unclosed block on line 2"},
+	}
+	for _, tt := range errors {
+		res := Render("plantuml", tt.src, 80)
+		if !res.Fallback || !strings.Contains(res.Lines[0].String(), tt.want) {
+			t.Errorf("%q: got\n%s\nwant a frame labelled %q", tt.src, lines(res), tt.want)
+		}
+	}
+}
+
 func TestPlantumlMindmap(t *testing.T) {
 	tests := []struct {
 		name string
@@ -390,6 +456,164 @@ func TestPlantumlMindmap(t *testing.T) {
 			}
 		})
 	}
+}
+
+// sameRender reports whether two diagrams are drawn as the same lines at
+// width, and neither falls back to its source.
+func sameRender(t *testing.T, name, gotLang, got, wantLang, want string, width int) {
+	t.Helper()
+	g, w := Render(gotLang, got, width), Render(wantLang, want, width)
+	if g.Fallback || w.Fallback {
+		t.Errorf("%s fell back to source:\n%s\nwant\n%s", name, lines(g), lines(w))
+		return
+	}
+	if lines(g) != lines(w) {
+		t.Errorf("%s:\n%s\nwant\n%s", name, lines(g), lines(w))
+	}
+}
+
+func TestStateDiagram(t *testing.T) {
+	tests := []struct{ name, state, flowchart string }{
+		{
+			"transitions",
+			"stateDiagram-v2\n    [*] --> Idle\n    Idle --> Loading : open\n    Loading --> [*]",
+			"flowchart TB\n    a[\"●\"]\n    b[\"Idle\"]\n    c[\"Loading\"]\n    d[\"◉\"]\n    a --> b\n    b -->|open| c\n    c --> d",
+		},
+		{
+			"descriptions",
+			"stateDiagram-v2\n    state \"Waiting\" as W\n    W : press a key\n    L : Loading data\n    W --> L",
+			"flowchart TB\n    a[\"Waiting<br>press a key\"]\n    b[\"Loading data\"]\n    a --> b",
+		},
+		{
+			"choice, fork and join",
+			"stateDiagram-v2\n    state c <<choice>>\n    state f [[fork]]\n    state j <<join>>\n    [*] --> c\n    c --> f : ok\n    f --> j\n    j --> [*]",
+			"flowchart TB\n    s[\"●\"]\n    c[\"◇\"]\n    f[\"━━━\"]\n    j[\"━━━\"]\n    e[\"◉\"]\n    s --> c\n    c -->|ok| f\n    f --> j\n    j --> e",
+		},
+	}
+	for _, tt := range tests {
+		sameRender(t, tt.name, "mermaid", tt.state, "mermaid", tt.flowchart, 80)
+	}
+
+	plain := "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Done"
+	ignored := "stateDiagram-v2\n    %% a comment\n    classDef warn fill:#f00\n    class Idle warn\n    style Idle fill:#f00\n" +
+		"    accTitle: States\n    accDescr: Some states\n    accDescr {\n        text\n    }\n    [*] --> Idle:::warn\n    Idle --> Done"
+	sameRender(t, "ignored lines", "mermaid", ignored, "mermaid", plain, 80)
+	sameRender(t, "stateDiagram", "mermaid", strings.Replace(plain, "-v2", "", 1), "mermaid", plain, 80)
+
+	errors := []struct{ src, want string }{
+		{"stateDiagram-v2\n    [*] --> A\n    A -> B", "mermaid - stateDiagram-v2 - unsupported line 3"},
+		{"stateDiagram-v2\n    A --> B\n    }", "mermaid - stateDiagram-v2 - unsupported line 3"},
+		{"stateDiagram-v2\n    A --> B\n    --", "mermaid - stateDiagram-v2 - unsupported line 3"},
+		{"stateDiagram-v2\n    state Active {\n    [*] --> Running", "mermaid - stateDiagram-v2 - unclosed block on line 2"},
+		{"stateDiagram-v2\n    A --> B\n    note left of A\n    text", "mermaid - stateDiagram-v2 - unclosed block on line 3"},
+		{"stateDiagram", "mermaid - stateDiagram - no states"},
+	}
+	for _, tt := range errors {
+		res := Render("mermaid", tt.src, 80)
+		if !res.Fallback || !strings.Contains(res.Lines[0].String(), tt.want) {
+			t.Errorf("%q: got\n%s\nwant a frame labelled %q", tt.src, lines(res), tt.want)
+		}
+	}
+}
+
+// drawn returns the lines of a diagram rendered at width, without the
+// trailing newline of lines.
+func drawn(t *testing.T, lang, src string, width int) string {
+	t.Helper()
+	res := Render(lang, src, width)
+	if res.Fallback {
+		t.Fatalf("fell back to source:\n%s", lines(res))
+	}
+	return strings.TrimSuffix(lines(res), "\n")
+}
+
+func TestStateLayout(t *testing.T) {
+	check := func(t *testing.T, name, got, want string) {
+		t.Helper()
+		if got != want {
+			t.Errorf("%s:\n%s\nwant\n%s", name, got, want)
+		}
+	}
+	state := func(lines ...string) string { return "stateDiagram-v2\n    " + strings.Join(lines, "\n    ") }
+	flow := func(lines ...string) string { return "flowchart " + strings.Join(lines, "\n    ") }
+
+	t.Run("composite state", func(t *testing.T) {
+		got := drawn(t, "mermaid", state("[*] --> Idle", "Idle --> Active : start", "state Active {", "[*] --> Running",
+			"Running --> Paused : pause", "Paused --> Running : resume", "}", "Active --> [*] : stop"), 80)
+		top := drawn(t, "mermaid", flow("TB", `s["●"]`, `i["Idle"]`, `a["Active"]`, `e["◉"]`, "s --> i", "i -->|start| a", "a -->|stop| e"), 80)
+		inner := drawn(t, "mermaid", flow("TB", `s["●"]`, `r["Running"]`, `p["Paused"]`, "s --> r", "r -->|pause| p", "p -->|resume| r"), 80)
+		check(t, "composite state", got, top+"\n\nActive\n\n"+inner)
+	})
+	t.Run("transition into a composite state", func(t *testing.T) {
+		got := drawn(t, "mermaid", state("[*] --> Idle", "state Active {", "[*] --> Running", "}", "Idle --> Running : resume"), 80)
+		top := drawn(t, "mermaid", flow("TB", `s["●"]`, `i["Idle"]`, `a["Active"]`, "s --> i", "i -->|resume| a"), 80)
+		inner := drawn(t, "mermaid", flow("TB", `s["●"]`, `r["Running"]`, "s --> r"), 80)
+		check(t, "transition into a composite state", got, top+"\n\nActive\n\n"+inner)
+	})
+	t.Run("concurrent regions", func(t *testing.T) {
+		got := drawn(t, "mermaid", state("[*] --> Active", "state Active {", "[*] --> A", "--", "[*] --> B", "}"), 80)
+		top := drawn(t, "mermaid", flow("TB", `s["●"]`, `a["Active"]`, "s --> a"), 80)
+		a := drawn(t, "mermaid", flow("TB", `s["●"]`, `a["A"]`, "s --> a"), 80)
+		b := drawn(t, "mermaid", flow("TB", `s["●"]`, `b["B"]`, "s --> b"), 80)
+		divider := strings.Repeat("┈", max(blockWidth(a), blockWidth(b)))
+		check(t, "concurrent regions", got, top+"\n\nActive\n\n"+a+"\n\n"+divider+"\n\n"+b)
+	})
+	t.Run("nested composite states", func(t *testing.T) {
+		got := drawn(t, "mermaid", state("state A {", "state B {", "x", "}", "}", "state C {", "y", "}"), 80)
+		var headers []string
+		for l := range strings.SplitSeq(got, "\n") {
+			if l == "A" || l == "B" || l == "C" {
+				headers = append(headers, l)
+			}
+		}
+		check(t, "nested composite states", strings.Join(headers, " "), "A B C")
+	})
+	t.Run("direction", func(t *testing.T) {
+		got := drawn(t, "mermaid", state("direction LR", "[*] --> A", "A --> B"), 80)
+		check(t, "direction", got, drawn(t, "mermaid", flow("LR", `s["●"]`, `a["A"]`, `b["B"]`, "s --> a", "a --> b"), 80))
+	})
+	t.Run("notes", func(t *testing.T) {
+		got := drawn(t, "mermaid", state("[*] --> Idle", "note right of Idle : waits for input", "note left of Idle", "first", "second", "end note"), 80)
+		top := drawn(t, "mermaid", flow("TB", `s["●"]`, `i["Idle"]`, "s --> i"), 80)
+		check(t, "notes", got, top+"\n\nIdle: waits for input\nIdle: first second")
+	})
+	t.Run("long note", func(t *testing.T) {
+		res := Render("mermaid", state("[*] --> A", "note right of A : this note has many words and wraps at the width"), 30)
+		var notes []string
+		for _, l := range res.Lines {
+			if s := l.String(); strings.HasPrefix(s, "A: ") || len(notes) > 0 {
+				notes = append(notes, s)
+			}
+		}
+		if len(notes) < 2 || res.Wide {
+			t.Fatalf("note not wrapped, wide=%v:\n%s", res.Wide, lines(res))
+		}
+		for _, l := range notes[1:] {
+			if !strings.HasPrefix(l, "  ") || strings.HasPrefix(l, "   ") || text.Width(l) > 30 {
+				t.Errorf("continuation line %q", l)
+			}
+		}
+	})
+	t.Run("links in the text of a state", func(t *testing.T) {
+		got := drawn(t, "mermaid", state(`state "Save & exit" as S`, `state "a --> b" as T`, "S --> T : x --> y"), 80)
+		for _, w := range []string{"│ Save & exit │", "a -‑› b", "x --> y"} {
+			if !strings.Contains(got, w) {
+				t.Errorf("output lacks %q:\n%s", w, got)
+			}
+		}
+	})
+	t.Run("title", func(t *testing.T) {
+		got := drawn(t, "mermaid", "---\ntitle: Player\n---\n"+state("[*] --> A"), 80)
+		check(t, "title", got, "Player\n\n"+drawn(t, "mermaid", flow("TB", `s["●"]`, `a["A"]`, "s --> a"), 80))
+	})
+	t.Run("horizontal state diagram re-laid out", func(t *testing.T) {
+		src := state("direction LR", "[*] --> First", "First --> Second", "Second --> Third", "Third --> [*]")
+		nodes := []string{`s["●"]`, `f["First"]`, `n["Second"]`, `t["Third"]`, `e["◉"]`, "s --> f", "f --> n", "n --> t", "t --> e"}
+		check(t, "re-laid out", drawn(t, "mermaid", src, 30), drawn(t, "mermaid", flow(append([]string{"TD"}, nodes...)...), 30))
+		if res := Render("mermaid", src, 5); !res.Wide || res.Fallback {
+			t.Errorf("wide=%v fallback=%v, want a wide diagram", res.Wide, res.Fallback)
+		}
+	})
 }
 
 func TestFrameIsRectangular(t *testing.T) {
@@ -471,6 +695,13 @@ func TestFlowchartWidthFitting(t *testing.T) {
 			t.Error("TD flowchart rewritten")
 		}
 	})
+}
+
+func TestFlowchartQuotedAmpersand(t *testing.T) {
+	res := Render("mermaid", "flowchart LR\n    a[\"Tom & Jerry\"] --> b", 200)
+	if !strings.Contains(lines(res), "│ Tom & Jerry ├") {
+		t.Errorf("quoted label split at &:\n%s", lines(res))
+	}
 }
 
 func TestWideSequenceDiagram(t *testing.T) {

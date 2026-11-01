@@ -1,0 +1,31 @@
+stateDiagram-v2
+    direction LR
+    [*] --> Idle
+    Idle --> Check : play
+    state Check <<choice>>
+    Check --> Active : ready
+    Check --> Error : no file
+    state Active {
+        [*] --> Split
+        state Split <<fork>>
+        Split --> Audio
+        Split --> Video
+        state Audio {
+            [*] --> Playing
+            Playing --> Muted : mute
+            Muted --> Playing : unmute
+        }
+        Audio --> Merge
+        Video --> Merge
+        state Merge <<join>>
+        Merge --> [*]
+        --
+        [*] --> Online
+        Online --> Offline : drop
+    }
+    Active --> Idle : stop
+    Error --> [*]
+    note right of Idle : nothing is playing
+    note left of Playing
+        sound is on
+    end note

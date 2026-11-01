@@ -28,6 +28,12 @@ func renderPlantUML(typ, src string, width int) (string, error) {
 			return "", err
 		}
 		return drawTree(title, root, width), nil
+	case "state":
+		d, err := parsePlantState(src)
+		if err != nil {
+			return "", err
+		}
+		return d.draw(width)
 	}
 	return "", errNotSupported
 }
@@ -659,4 +665,208 @@ func parsePlantMindmap(src string) (string, *mindNode, error) {
 		return "", nil, errors.New("no nodes")
 	}
 	return title, root, nil
+}
+
+var (
+	// plantStateRE matches a state declaration of a PlantUML state diagram:
+	// "text" as id, id as "text" or id, an optional stereotype, optional
+	// colors and an optional { that opens a composite state.
+	plantStateRE = regexp.MustCompile(`^state\s+(?:"([^"]*)"\s+as\s+([^\s"{<#]+)|([^\s"{<#]+)\s+as\s+"([^"]*)"|([^\s"{<#]+))\s*(?:<<([^>]*)>>)?\s*(?:#[^\s{]*\s*)*(\{)?$`)
+	// plantArrowRE matches a transition before its label: a source, an arrow
+	// of dashes with optional directions and [styles] among them, and a
+	// target. The arrow starts with < or ends with >.
+	plantArrowRE     = regexp.MustCompile(`^(\S+?)\s*(<-+(?:up|down|left|right|do|le|ri|u|d|l|r|\[[^\]]*\]|-)*>?|-+(?:up|down|left|right|do|le|ri|u|d|l|r|\[[^\]]*\]|-)*>)\s*(\S+)$`)
+	plantHistoryRE   = regexp.MustCompile(`^([^\s:\[\]"]*)\[(H\*?)\]$`)
+	plantStateIDRE   = regexp.MustCompile(`^[^\s:\[\]"]+$`)
+	plantStateNoteRE = regexp.MustCompile(`^note\s+(?:left|right|top|bottom)\s+of\s+([^\s:]+)\s*(?::(.*))?$`)
+	plantLinkNoteRE  = regexp.MustCompile(`^note\s+on\s+link\s*(?::(.*))?$`)
+)
+
+// plantKinds maps the stereotypes of the special states of PlantUML to their
+// kinds; <<start>> and <<end>> are plain states with a symbol as their text.
+var plantKinds = map[string]stateKind{"choice": stateChoice, "fork": stateBar, "join": stateBar}
+
+// parsePlantState reads a PlantUML state diagram into the model of mermaid
+// state diagrams.
+func parsePlantState(src string) (*stateDiagram, error) {
+	lines := strings.Split(src, "\n")
+	d := newStateDiagram()
+	for i := 0; i < len(lines); i++ {
+		n := i + 1
+		s := strings.TrimSpace(lines[i])
+		switch {
+		case hasKeyword(s, "legend"), s == "header", s == "footer":
+			// A block up to endlegend, endheader or endfooter.
+			end := "end" + strings.Fields(s)[0]
+			for i < len(lines) && !hasKeyword(strings.ReplaceAll(strings.TrimSpace(lines[i]), "end ", "end"), end) {
+				i++
+			}
+		case s == "" || strings.HasPrefix(s, "'") || strings.HasPrefix(s, "@start") || strings.HasPrefix(s, "@end"),
+			strings.HasPrefix(s, "!"), hasKeyword(s, "hide", "show", "scale", "header", "footer", "caption"):
+		case strings.HasPrefix(s, "/'"):
+			for i < len(lines) && !strings.HasSuffix(strings.TrimSpace(lines[i]), "'/") {
+				i++
+			}
+		case hasKeyword(s, "skinparam"):
+			if strings.HasSuffix(s, "{") {
+				for i < len(lines) && strings.TrimSpace(lines[i]) != "}" {
+					i++
+				}
+			}
+		case hasKeyword(s, "title"):
+			d.title = strings.ReplaceAll(strings.TrimSpace(strings.TrimPrefix(s, "title")), `\n`, " ")
+		case s == "left to right direction":
+			d.root.dir = "LR"
+		case s == "top to bottom direction":
+			d.root.dir = "TB"
+		case s == "}":
+			if !d.close() {
+				return nil, unsupportedLine(n)
+			}
+		case s == "--" || s == "||":
+			if !d.split() {
+				return nil, unsupportedLine(n)
+			}
+		case strings.HasPrefix(s, "note "):
+			if !d.plantNote(s, lines, &i) {
+				if i < 0 {
+					return nil, unclosedBlock(n)
+				}
+				return nil, unsupportedLine(n)
+			}
+		case strings.HasPrefix(s, "state "):
+			if !d.plantDeclare(s, n) {
+				return nil, unsupportedLine(n)
+			}
+		default:
+			if !d.plantTransitionOrDescription(s) {
+				return nil, unsupportedLine(n)
+			}
+		}
+	}
+	return d, d.finish()
+}
+
+// plantDeclare reads a state line of a PlantUML state diagram.
+func (d *stateDiagram) plantDeclare(s string, n int) bool {
+	m := plantStateRE.FindStringSubmatch(s)
+	if m == nil {
+		return false
+	}
+	st := d.state(m[2] + m[3] + m[5])
+	if desc := m[1] + m[4]; desc != "" {
+		st.desc = append(st.desc, plantLines(desc)...)
+	}
+	switch stereotype := m[6]; stereotype {
+	case "start":
+		st.desc = []string{symbols[stateStart]}
+	case "end":
+		st.desc = []string{symbols[stateEnd]}
+	default:
+		st.kind = plantKinds[stereotype]
+	}
+	if m[7] != "" {
+		d.open(st, n)
+	}
+	return true
+}
+
+// plantTransitionOrDescription reads a transition or an "id : text"
+// description of a PlantUML state diagram.
+func (d *stateDiagram) plantTransitionOrDescription(s string) bool {
+	head, label, hasLabel := strings.Cut(s, ":")
+	if m := plantArrowRE.FindStringSubmatch(strings.TrimSpace(head)); m != nil {
+		reversed := strings.HasPrefix(m[2], "<") && !strings.HasSuffix(m[2], ">")
+		left, ok1 := d.plantEnd(m[1], !reversed)
+		right, ok2 := d.plantEnd(m[3], reversed)
+		if !ok1 || !ok2 {
+			return false
+		}
+		if reversed {
+			left, right = right, left
+		}
+		d.transitions = append(d.transitions, &transition{
+			from:  left,
+			to:    right,
+			label: strings.TrimSpace(strings.ReplaceAll(label, `\n`, " ")),
+		})
+		return true
+	}
+	id := strings.TrimSpace(head)
+	if !hasLabel || !plantStateIDRE.MatchString(id) {
+		return false
+	}
+	st := d.state(id)
+	if text := strings.TrimSpace(label); text != "" {
+		st.desc = append(st.desc, plantLines(text)...)
+	}
+	return true
+}
+
+// plantEnd returns the state named by an end of a PlantUML transition:
+// [*], a history, or a state.
+func (d *stateDiagram) plantEnd(tok string, source bool) (*state, bool) {
+	if tok == "[*]" {
+		return d.end(tok, source), true
+	}
+	if m := plantHistoryRE.FindStringSubmatch(tok); m != nil {
+		owner := d.current().owner
+		if m[1] != "" {
+			owner = d.state(m[1])
+		}
+		return d.history(owner, m[2]), true
+	}
+	if !plantStateIDRE.MatchString(tok) {
+		return nil, false
+	}
+	return d.state(tok), true
+}
+
+// history returns the history state H or H* of a composite state, a state
+// in its first region, which it creates when the composite state has none.
+func (d *stateDiagram) history(owner *state, h string) *state {
+	id := owner.id + "[" + h + "]"
+	if s, ok := d.ids[id]; ok {
+		return s
+	}
+	if len(owner.regions) == 0 {
+		owner.regions = []*region{{owner: owner}}
+	}
+	r := owner.regions[0]
+	s := &state{id: id, desc: []string{h}, parent: r}
+	r.states = append(r.states, s)
+	d.ids[id] = s
+	return s
+}
+
+// plantNote reads a note of a PlantUML state diagram at the line *i and
+// moves *i to its last line. It sets *i to -1 when "end note" is missing.
+func (d *stateDiagram) plantNote(s string, lines []string, i *int) bool {
+	note := stateNote{}
+	var inline string
+	if m := plantStateNoteRE.FindStringSubmatch(s); m != nil {
+		note.of, inline = d.state(m[1]), m[2]
+	} else if m := plantLinkNoteRE.FindStringSubmatch(s); m != nil && len(d.transitions) > 0 {
+		note.link, inline = d.transitions[len(d.transitions)-1], m[1]
+	} else {
+		return false
+	}
+	text, last, ok := noteText(inline, strings.Contains(s, ":"), lines, *i)
+	if !ok {
+		*i = -1
+		return false
+	}
+	note.text = strings.ReplaceAll(text, `\n`, " ")
+	d.notes = append(d.notes, note)
+	*i = last
+	return true
+}
+
+// plantLines splits a PlantUML text at its \n line breaks.
+func plantLines(s string) []string {
+	parts := strings.Split(s, `\n`)
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	return parts
 }

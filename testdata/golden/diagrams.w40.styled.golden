@@ -15,11 +15,11 @@
      │◄┈┈┈┈┈┈┈┈┈┈┈┨
      │            │
 
-┌─ mermaid - stateDiagram-v2 - not supported ┐
-│ stateDiagram-v2                            │
-│     [*] --> Idle                           │
-│     Idle --> Loading: open                 │
-└────────────────────────────────────────────┘
+┌─ mermaid - classDiagram - not supported ┐
+│ classDiagram                            │
+│     class User                          │
+│     User --> Session: opens             │
+└─────────────────────────────────────────┘
 
 The paragraph after the diagrams is
 rendered normally.

@@ -1119,8 +1119,8 @@ func TestControlCharacters(t *testing.T) {
 		}
 	})
 	t.Run("unsupported diagram", func(t *testing.T) {
-		got := renderLines("```mermaid\nstateDiagram-v2\n  [*] --> \x1b[31mIdle\n```\n", plain(80))
-		if len(got) != 4 || !strings.Contains(got[2], "[*] --> ␛[31mIdle") || !sameWidth(got) {
+		got := renderLines("```mermaid\nclassDiagram\n  class \x1b[31mUser\n```\n", plain(80))
+		if len(got) != 4 || !strings.Contains(got[2], "class ␛[31mUser") || !sameWidth(got) {
 			t.Errorf("got %q", got)
 		}
 	})

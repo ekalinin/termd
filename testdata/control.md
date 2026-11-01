@@ -56,6 +56,6 @@ graph LR
 ```
 
 ```mermaid
-stateDiagram-v2
-    [*] --> ESC[31m
+classDiagram
+    class ESC[31m
 ```

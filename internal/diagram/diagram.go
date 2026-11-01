@@ -131,6 +131,8 @@ func Render(lang, src string, width int) Result {
 		out, err = safeRender(src, mdiagram.DefaultConfig())
 	case "flowchart", "graph":
 		out, err = renderFlowchart(src, width)
+	case "stateDiagram", "stateDiagram-v2":
+		out, err = renderState(src, width)
 	case "mindmap":
 		out, err = renderMindmap(src, width)
 	case "gantt":

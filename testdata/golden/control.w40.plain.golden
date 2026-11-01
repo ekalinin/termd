@@ -60,7 +60,7 @@ this is the next line
 │            │     │     │
 └────────────┘     └─────┘
 
-┌─ mermaid - stateDiagram-v2 - not supported ┐
-│ stateDiagram-v2                            │
-│     [*] --> ESC␛[31m                       │
-└────────────────────────────────────────────┘
+┌─ mermaid - classDiagram - not supported ┐
+│ classDiagram                            │
+│     class ESC␛[31m                      │
+└─────────────────────────────────────────┘

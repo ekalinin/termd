@@ -10,9 +10,9 @@ sequenceDiagram
 ```
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Loading: open
+classDiagram
+    class User
+    User --> Session: opens
 ```
 
 The paragraph after the diagrams is rendered normally.

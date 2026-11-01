@@ -1,5 +1,5 @@
-github.com/AlexanderGrooff/mermaid-ascii v0.0.0-20260908213847-5f00e3d9ac9f h1:DePqbqug3bwaA9NN2L+HKytidIRBR1yI2Ub3C8jWW+A=
-github.com/AlexanderGrooff/mermaid-ascii v0.0.0-20260908213847-5f00e3d9ac9f/go.mod h1:xA3Kur4lUW3iHdFmcG19MsbdmJ2LW3RSKWa0WZpV9oQ=
+github.com/AlexanderGrooff/mermaid-ascii v0.0.0-20261019220251-5a9df1560871 h1:vXoxETRu8hsWer57x8Fx7x887ee6FW5qjAkcg25RLPE=
+github.com/AlexanderGrooff/mermaid-ascii v0.0.0-20261019220251-5a9df1560871/go.mod h1:xA3Kur4lUW3iHdFmcG19MsbdmJ2LW3RSKWa0WZpV9oQ=
 github.com/alecthomas/assert/v2 v2.11.0 h1:2Q9r3ki8+JYXvGsDyBXwH3LcJ+WK5D0gc5E8vS6K3D0=
 github.com/alecthomas/assert/v2 v2.11.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=
 github.com/alecthomas/chroma/v2 v2.27.0 h1:FodwmyOBgJULFYmDqibcp9pvfDLWdtPRh9v/r5BXYZs=

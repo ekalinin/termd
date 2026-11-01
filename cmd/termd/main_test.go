@@ -730,13 +730,13 @@ func TestPaging(t *testing.T) {
 }
 
 func TestUnsupportedDiagramExitsZero(t *testing.T) {
-	path := writeFile(t, "```mermaid\nstateDiagram-v2\n    [*] --> Idle\n```\n\nAfter.\n")
+	path := writeFile(t, "```mermaid\nclassDiagram\n    class User\n```\n\nAfter.\n")
 	f := &fake{stdinTTY: true}
 	if code := f.run(path); code != 0 {
 		t.Errorf("exit %d, want 0", code)
 	}
 	out := f.stdout.String()
-	if !strings.Contains(out, "stateDiagram-v2 - not supported") || !strings.Contains(out, "After.") {
+	if !strings.Contains(out, "classDiagram - not supported") || !strings.Contains(out, "After.") {
 		t.Errorf("output %q", out)
 	}
 }

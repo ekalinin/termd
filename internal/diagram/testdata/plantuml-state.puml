@@ -1,0 +1,25 @@
+@startuml
+title Player
+hide empty description
+[*] --> Idle
+Idle -> Active : play
+state Active #lightblue {
+  [*] -> Playing
+  Playing -right-> Paused : pause
+  Paused --> Playing : resume
+  Playing --> [H]
+  ||
+  [*] --> Online
+  Online -[#red]-> Offline : drop
+}
+state "Long name\nof a state" as Long
+Active --> Long : stop
+Long --> Active[H] : back
+note on link
+  returns to the last state
+end note
+state c <<choice>>
+Long --> c
+c --> [*]
+note left of Idle : waits
+@enduml

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -358,6 +359,53 @@ func TestRelativeLinks(t *testing.T) {
 			t.Errorf("stdout %q", f.stdout.String())
 		}
 	})
+}
+
+func TestBaseURL(t *testing.T) {
+	const doc = "[guide](docs/guide.md)\n"
+	t.Run("stdin", func(t *testing.T) {
+		f := &fake{stdin: doc}
+		want := "\x1b]8;;https://github.com/o/r/blob/main/docs/guide.md\x1b\\guide"
+		if f.run("--hyperlinks=always", "--base-url", "https://github.com/o/r/blob/main/"); !strings.Contains(f.stdout.String(), want) {
+			t.Errorf("stdout %q lacks %q", f.stdout.String(), want)
+		}
+	})
+	t.Run("file", func(t *testing.T) {
+		path := writeFile(t, "[a](a.md)\n")
+		f := &fake{stdinTTY: true}
+		f.run("--hyperlinks=always", "--base-url", "https://example.com/docs/", path)
+		if want := "\x1b]8;;https://example.com/docs/a.md\x1b\\a"; !strings.Contains(f.stdout.String(), want) || strings.Contains(f.stdout.String(), "file:") {
+			t.Errorf("stdout %q, want %q and no file: URL", f.stdout.String(), want)
+		}
+	})
+	t.Run("file URL", func(t *testing.T) {
+		f := &fake{stdin: doc}
+		want := "\x1b]8;;file:///home/me/proj/docs/guide.md\x1b\\guide"
+		if f.run("--hyperlinks=always", "--base-url", "file:///home/me/proj/"); !strings.Contains(f.stdout.String(), want) {
+			t.Errorf("stdout %q lacks %q", f.stdout.String(), want)
+		}
+	})
+	t.Run("hyperlinks disabled", func(t *testing.T) {
+		path := writeFile(t, doc)
+		f := &fake{stdinTTY: true}
+		if f.run("--hyperlinks=never", "--base-url", "https://example.com/", path); !strings.Contains(f.stdout.String(), "guide (docs/guide.md)") {
+			t.Errorf("stdout %q", f.stdout.String())
+		}
+	})
+	for _, v := range []string{"github.com/o/r/blob/main/", "localhost:8080/docs/", "https:///docs/", ""} {
+		t.Run("invalid "+v, func(t *testing.T) {
+			f := &fake{stdin: doc}
+			if code := f.run("--base-url=" + v); code != 2 {
+				t.Errorf("exit %d, want 2", code)
+			}
+			if want := fmt.Sprintf("--base-url must be an absolute URL, such as https://example.com/docs/, got %q", v); !strings.Contains(f.stderr.String(), want) {
+				t.Errorf("stderr %q does not contain %q", f.stderr.String(), want)
+			}
+			if f.stdout.Len() != 0 {
+				t.Errorf("stdout %q, want nothing", f.stdout.String())
+			}
+		})
+	}
 }
 
 func TestVersion(t *testing.T) {

@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -38,6 +39,9 @@ type Options struct {
 	// relative link destinations are resolved against it; empty keeps every
 	// destination as written.
 	Dir string
+	// BaseURL is the URL against which relative link destinations are
+	// resolved with hyperlinks, instead of Dir; nil means none.
+	BaseURL *url.URL
 	// HTMLSource shows HTML blocks and inline HTML as their source instead
 	// of interpreting their tags.
 	HTMLSource bool

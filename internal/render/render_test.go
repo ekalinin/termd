@@ -1,6 +1,7 @@
 package render
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -818,9 +819,98 @@ func TestRelativeLinks(t *testing.T) {
 	}
 }
 
+func TestBaseURL(t *testing.T) {
+	const base = "https://github.com/o/r/blob/main/"
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := `[guide](docs/guide.md) ![logo](img/logo.png?raw=true) <img src="img/arch.png" alt="arch"> <a href="docs/a.md">a</a> [empty]()` + "\n"
+	opts := Options{Width: 80, Style: style.Options{Hyperlinks: true}, BaseURL: baseURL}
+	links := []string{
+		"\x1b]8;;" + base + "docs/guide.md\x1b\\guide\x1b]8;;\x1b\\",
+		"\x1b]8;;" + base + "img/logo.png?raw=true\x1b\\[image: logo]\x1b]8;;\x1b\\",
+		"\x1b]8;;" + base + "img/arch.png\x1b\\[image: arch]\x1b]8;;\x1b\\",
+		"\x1b]8;;" + base + "docs/a.md\x1b\\a\x1b]8;;\x1b\\",
+	}
+	out := Render([]byte(src), opts)
+	for _, want := range links {
+		if !strings.Contains(out, want) {
+			t.Errorf("output %q lacks %q", out, want)
+		}
+	}
+	if strings.Count(out, "\x1b]8;;\x1b\\") != len(links) || !strings.HasSuffix(out, " empty\n") {
+		t.Errorf("empty destination got a hyperlink: %q", out)
+	}
+
+	opts.Dir = "/home/u/proj"
+	out = Render([]byte(src), opts)
+	if !strings.Contains(out, links[0]) || strings.Contains(out, "file:") {
+		t.Errorf("with a directory: %q", out)
+	}
+
+	opts.Style.Hyperlinks = false
+	if got := renderLines("[guide](docs/guide.md)\n", opts)[0]; got != "guide (docs/guide.md)" {
+		t.Errorf("plain output = %q", got)
+	}
+}
+
 func TestFileURL(t *testing.T) {
 	if got := fileURL("", "C:/proj/docs/guide.md", ""); got != "file:///C:/proj/docs/guide.md" {
 		t.Errorf("Windows path: %q", got)
+	}
+}
+
+func TestResolveBase(t *testing.T) {
+	parse := func(s string) *url.URL {
+		u, err := url.Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	resolve := func(dest, base string) string {
+		return resolveBase(dest, string(unescape([]byte(dest))), parse(base))
+	}
+	const base = "https://github.com/o/r/blob/main/"
+	tests := []struct {
+		dest, want string
+	}{
+		{"docs/guide.md", base + "docs/guide.md"},
+		{"../other/b.md", "https://github.com/o/r/blob/other/b.md"},
+		{"guide.md#setup", base + "guide.md#setup"},
+		{"logo.png?raw=true", base + "logo.png?raw=true"},
+		{"my notes.md", base + "my%20notes.md"},
+		{"my%20notes.md", base + "my%20notes.md"},
+		{"файл.md", base + "%D1%84%D0%B0%D0%B9%D0%BB.md"},
+		{`my\_notes.md`, base + "my_notes.md"},
+		{"/docs/x.md", base + "docs/x.md"},
+		{"/a%2Fb", base + "a%2Fb"},
+		{"/", base},
+		{"//example.com/x", "https://example.com/x"},
+		{"https://example.com", "https://example.com"},
+		{"mailto:me@example.com", "mailto:me@example.com"},
+		{"C:/x", "C:/x"},
+		{"#usage", "#usage"},
+		{"?tab=1", "?tab=1"},
+		{"", ""},
+		{"%zz", "%zz"},
+	}
+	for _, tt := range tests {
+		if got := resolve(tt.dest, base); got != tt.want {
+			t.Errorf("resolveBase(%q) = %q, want %q", tt.dest, got, tt.want)
+		}
+	}
+	for _, tt := range []struct {
+		base, want string
+	}{
+		{"https://raw.githubusercontent.com/o/r/main/README.md", "https://raw.githubusercontent.com/o/r/main/docs/guide.md"},
+		{"https://github.com/o/r/blob/main", "https://github.com/o/r/blob/docs/guide.md"},
+		{"file:///home/me/proj/", "file:///home/me/proj/docs/guide.md"},
+	} {
+		if got := resolve("docs/guide.md", tt.base); got != tt.want {
+			t.Errorf("base %q: got %q, want %q", tt.base, got, tt.want)
+		}
 	}
 }
 

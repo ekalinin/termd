@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -109,6 +110,7 @@ func run(args []string, e env) int {
 	hyperlinks := fs.String("hyperlinks", "auto", "terminal hyperlinks: auto, always or never")
 	themeFlag := fs.String("theme", "auto", "color theme: "+themeValues())
 	htmlMode := fs.String("html", "render", "HTML in the document: render or source")
+	baseURLFlag := fs.String("base-url", "", "base URL for relative links and images, such as https://github.com/o/r/blob/main/")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = func() {
 		fmt.Fprint(e.stderr, usage)
@@ -130,10 +132,11 @@ func run(args []string, e env) int {
 		return 2
 	}
 
-	widthSet, themeSet := false, false
+	widthSet, themeSet, baseURLSet := false, false, false
 	fs.Visit(func(f *flag.Flag) {
 		widthSet = widthSet || f.Name == "width"
 		themeSet = themeSet || f.Name == "theme"
+		baseURLSet = baseURLSet || f.Name == "base-url"
 	})
 	if widthSet && *width <= 0 {
 		return usageError("--width must be a positive number, got %d", *width)
@@ -143,6 +146,12 @@ func run(args []string, e env) int {
 	}
 	if !slices.Contains([]string{"render", "source"}, *htmlMode) {
 		return usageError("--html must be render or source, got %q", *htmlMode)
+	}
+	var baseURL *url.URL
+	if baseURLSet {
+		if baseURL = parseBaseURL(*baseURLFlag); baseURL == nil {
+			return usageError("--base-url must be an absolute URL, such as https://example.com/docs/, got %q", *baseURLFlag)
+		}
 	}
 	// A given --theme wins over TERMD_THEME; only the value used is checked.
 	themeName, themeSource := *themeFlag, "--theme"
@@ -189,6 +198,7 @@ func run(args []string, e env) int {
 		Theme:      themeFunc(themeName, e.detectLight),
 		Palette:    themePalette(themeName),
 		Dir:        docDir(file),
+		BaseURL:    baseURL,
 		HTMLSource: *htmlMode == "source",
 	}
 	// A file whose name the highlighter recognizes is shown as code; stdin is
@@ -262,6 +272,16 @@ func docDir(path string) string {
 		return ""
 	}
 	return filepath.Dir(abs)
+}
+
+// parseBaseURL returns the value of --base-url as a URL, or nil when it is
+// neither an absolute URL with a host nor a file URL with an absolute path.
+func parseBaseURL(v string) *url.URL {
+	u, err := url.Parse(v)
+	if err != nil || u.Scheme == "" || (u.Host == "" && (u.Scheme != "file" || !strings.HasPrefix(u.Path, "/"))) {
+		return nil
+	}
+	return u
 }
 
 // colorDepth selects 24-bit colors when COLORTERM advertises them.

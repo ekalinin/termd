@@ -25,9 +25,13 @@ var localHost = sync.OnceValue(func() string {
 })
 
 // destination returns the URL of a link or an image. With hyperlinks, a
-// relative path is resolved against the directory of the document; in plain
-// mode the destination is shown as written, which reads better.
+// relative path is resolved against the base URL, or else against the
+// directory of the document; in plain mode the destination is shown as
+// written, which reads better.
 func (r *renderer) destination(dest []byte) string {
+	if r.opts.Style.Hyperlinks && r.opts.BaseURL != nil {
+		return resolveBase(string(dest), string(unescape(dest)), r.opts.BaseURL)
+	}
 	if !r.opts.Style.Hyperlinks || r.opts.Dir == "" {
 		return string(dest)
 	}
@@ -86,6 +90,9 @@ func shortText(dest string) (string, bool) {
 // htmlDestination returns the URL of an href or src attribute, which the
 // tokenizer has already decoded, under the rules of destination.
 func (r *renderer) htmlDestination(v string) string {
+	if r.opts.Style.Hyperlinks && r.opts.BaseURL != nil {
+		return resolveBase(v, v, r.opts.BaseURL)
+	}
 	if !r.opts.Style.Hyperlinks || r.opts.Dir == "" {
 		return v
 	}
@@ -110,6 +117,26 @@ func resolveDecoded(dest, decoded, dir, host string) string {
 		return dest
 	}
 	return fileURL(host, filepath.Join(dir, filepath.FromSlash(u.Path)), u.Fragment)
+}
+
+// resolveBase returns the URL of the link destination dest, whose escapes and
+// character references decode to decoded, against the base URL base. A
+// destination with a scheme, without a host and a path, or that is not a
+// valid URL reference is returned as written. A leading slash is removed, as
+// glamour does, so /docs/x.md is resolved below the base; //host/x gets the
+// scheme of the base. The query and the fragment are kept.
+func resolveBase(dest, decoded string, base *url.URL) string {
+	u, err := url.Parse(decoded)
+	if err != nil || u.Scheme != "" || (u.Host == "" && u.Path == "") {
+		return dest
+	}
+	if u.Host == "" {
+		// RawPath is empty or the escaped form of Path, so it keeps
+		// matching it.
+		u.Path = strings.TrimPrefix(u.Path, "/")
+		u.RawPath = strings.TrimPrefix(u.RawPath, "/")
+	}
+	return base.ResolveReference(u).String()
 }
 
 // fileURL returns the file URL of the absolute path p on host. The query of a

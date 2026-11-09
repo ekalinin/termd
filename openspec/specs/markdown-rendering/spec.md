@@ -126,9 +126,17 @@ Blocks that cannot be wrapped without losing structure (code blocks, tables that
 ### Requirement: Hyperlinks
 When hyperlinks are enabled, termd SHALL render each link as its visible text wrapped in an OSC 8 terminal hyperlink to the link destination, and SHALL measure only the visible text. When hyperlinks are disabled, termd SHALL render a link as `text (url)`, or as just the URL when the text equals the URL, except in a table cell, where the URL is listed below the table as described in "Links in cells without hyperlinks" of the table-rendering capability. termd SHALL NOT truncate URLs.
 
-When the document is read from a file and hyperlinks are enabled, termd SHALL resolve a relative destination of a link or an image against the directory of that file and write it into the hyperlink as an absolute `file:` URL. A relative destination is a destination without a scheme that has a path and does not start with `/`, for example `docs/guide.md`, `./a.md` or `../b.md`. The URL SHALL consist of `file://`, the host name of the machine, the absolute path of the target with the `.` and `..` segments resolved, and the fragment of the destination, if any; the query of the destination SHALL be dropped. Backslash escapes, character references and percent-encoded characters of the destination SHALL be decoded, and every character that a URL does not allow in a path, such as a space or a non-ASCII character, SHALL be percent-encoded, so that no character is encoded twice. When the host name of the machine cannot be determined, and on Windows, the host SHALL be empty.
+When the document is read from a file, hyperlinks are enabled and no base URL is given, termd SHALL resolve a relative destination of a link or an image against the directory of that file and write it into the hyperlink as an absolute `file:` URL. A relative destination is a destination without a scheme that has a path and does not start with `/`, for example `docs/guide.md`, `./a.md` or `../b.md`. The URL SHALL consist of `file://`, the host name of the machine, the absolute path of the target with the `.` and `..` segments resolved, and the fragment of the destination, if any; the query of the destination SHALL be dropped. Backslash escapes, character references and percent-encoded characters of the destination SHALL be decoded, and every character that a URL does not allow in a path, such as a space or a non-ASCII character, SHALL be percent-encoded, so that no character is encoded twice. When the host name of the machine cannot be determined, and on Windows, the host SHALL be empty.
 
-termd SHALL write a destination into the hyperlink as written in the document when it has a scheme (`https:`, `mailto:` and any other), when it is fragment-only (`#section`), when it starts with `/` (including `//host/path`), when it is empty, and when it is not a valid URL reference. When the document is read from stdin, or when hyperlinks are disabled, termd SHALL NOT resolve any destination.
+When a base URL is given with `--base-url` and hyperlinks are enabled, termd SHALL resolve destinations of links and images against the base URL instead of the directory of the document file, for a document from a file and from stdin, and write them into the hyperlink as absolute URLs; termd SHALL NOT make `file:` URLs from the directory of the document file then:
+
+- a relative destination SHALL be resolved by RFC 3986: when the path of the base URL does not end with `/`, its last segment SHALL be replaced, the `.` and `..` segments SHALL be resolved, and the query and the fragment of the destination SHALL be kept;
+- a destination that starts with a single `/` SHALL lose the `/` and be resolved as a relative destination;
+- a destination that starts with `//` SHALL get the scheme of the base URL.
+
+Backslash escapes and character references of such a destination SHALL be decoded, and the path and the fragment SHALL be percent-encoded as for `file:` URLs, so that no character is encoded twice; the query SHALL keep its percent-encoded characters as written.
+
+termd SHALL write a destination into the hyperlink as written in the document when it has a scheme (`https:`, `mailto:` and any other), when it is fragment-only (`#section`), when it is empty, and when it is not a valid URL reference, and, without a base URL, when it starts with `/` (including `//host/path`). When the document is read from stdin without a base URL, or when hyperlinks are disabled, termd SHALL NOT resolve any destination.
 
 When hyperlinks are enabled, termd SHALL show an autolink, a bare URL or a URL in `<` and `>`, to an issue, a pull request, a discussion or a commit on GitHub with a short text, and its hyperlink SHALL be the full URL. Such a URL SHALL consist of `https://github.com/` or `http://github.com/`, with the scheme and the host in any case, `owner/repo` and one of these endings, where `N` is a number and `SHA` is 7 to 40 hexadecimal digits:
 
@@ -198,6 +206,42 @@ The owner SHALL consist of ASCII letters, digits, `-` and `_`, the repository of
 #### Scenario: Windows
 - **WHEN** termd runs on Windows and the file `C:\proj\README.md` contains `[guide](docs/guide.md)`
 - **THEN** the hyperlink of `guide` is `file:///C:/proj/docs/guide.md`
+
+#### Scenario: Base URL
+- **WHEN** a document from stdin contains `[guide](docs/guide.md)` and `![logo](img/logo.png?raw=true)`, and it is rendered with hyperlinks enabled and the base URL `https://github.com/o/r/blob/main/`
+- **THEN** their hyperlinks are `https://github.com/o/r/blob/main/docs/guide.md` and `https://github.com/o/r/blob/main/img/logo.png?raw=true`
+
+#### Scenario: Base URL of a document
+- **WHEN** a document contains `[guide](docs/guide.md)` and it is rendered with hyperlinks enabled and the base URL `https://raw.githubusercontent.com/o/r/main/README.md`, and then with the base URL `https://github.com/o/r/blob/main`
+- **THEN** the hyperlink of `guide` is `https://raw.githubusercontent.com/o/r/main/docs/guide.md` and then `https://github.com/o/r/blob/docs/guide.md`
+
+#### Scenario: Base URL with dot segments, fragments and spaces
+- **WHEN** a document contains `[b](../other/b.md)`, `[setup](guide.md#setup)` and `[n](<my notes.md>)`, and it is rendered with hyperlinks enabled and the base URL `https://example.com/docs/`
+- **THEN** their hyperlinks are `https://example.com/other/b.md`, `https://example.com/docs/guide.md#setup` and `https://example.com/docs/my%20notes.md`
+
+#### Scenario: Base URL and a leading slash
+- **WHEN** a document contains `[x](/docs/x.md)` and `[e](//example.com/x)`, and it is rendered with hyperlinks enabled and the base URL `https://github.com/o/r/blob/main/`
+- **THEN** their hyperlinks are `https://github.com/o/r/blob/main/docs/x.md` and `https://example.com/x`
+
+#### Scenario: Base URL over the directory of the file
+- **WHEN** the file `/home/u/proj/README.md` contains `[a](a.md)` and it is rendered with hyperlinks enabled and the base URL `https://example.com/docs/`
+- **THEN** the hyperlink of `a` is `https://example.com/docs/a.md`
+
+#### Scenario: File base URL
+- **WHEN** a document from stdin contains `[guide](docs/guide.md)` and it is rendered with hyperlinks enabled and the base URL `file:///home/me/proj/`
+- **THEN** the hyperlink of `guide` is `file:///home/me/proj/docs/guide.md`
+
+#### Scenario: Destinations that are not resolved against the base URL
+- **WHEN** a document contains links to `https://example.com`, `mailto:me@example.com` and `#usage`, and `[empty]()`, and it is rendered with hyperlinks enabled and the base URL `https://github.com/o/r/blob/main/`
+- **THEN** the hyperlink of each of the first three links is its destination exactly as written, and `empty` has no hyperlink
+
+#### Scenario: HTML with a base URL
+- **WHEN** a document contains `<img src="img/arch.png" alt="arch">` and `<a href="docs/guide.md">guide</a>`, and it is rendered with hyperlinks enabled and the base URL `https://example.com/`
+- **THEN** their hyperlinks are `https://example.com/img/arch.png` and `https://example.com/docs/guide.md`
+
+#### Scenario: Base URL with hyperlinks disabled
+- **WHEN** a document contains `[guide](docs/guide.md)` and it is rendered with hyperlinks disabled and the base URL `https://example.com/`
+- **THEN** the output contains `guide (docs/guide.md)`
 
 #### Scenario: GitHub pull request
 - **WHEN** a document contains the bare URL `https://github.com/ekalinin/termd/pull/19` and hyperlinks are enabled

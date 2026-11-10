@@ -408,6 +408,49 @@ func TestBaseURL(t *testing.T) {
 	}
 }
 
+func TestASCIIFlag(t *testing.T) {
+	t.Run("pipe", func(t *testing.T) {
+		f := &fake{stdin: "- item\n\n> quoted\n"}
+		if code := f.run("--ascii"); code != 0 {
+			t.Fatalf("exit %d", code)
+		}
+		if got, want := f.stdout.String(), "* item\n\n| quoted\n"; got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+	t.Run("styles and hyperlinks", func(t *testing.T) {
+		const doc = "> [docs](https://example.com)\n"
+		unicode := &fake{stdin: doc, stdoutTTY: true, width: 80, height: 24}
+		unicode.run("--hyperlinks=always")
+		ascii := &fake{stdin: doc, stdoutTTY: true, width: 80, height: 24}
+		ascii.run("--ascii", "--hyperlinks=always")
+		got := ascii.stdout.String()
+		if want := strings.ReplaceAll(unicode.stdout.String(), "│", "|"); got != want || got == doc {
+			t.Errorf("got %q, want %q", got, want)
+		}
+		if link := "\x1b]8;;https://example.com\x1b\\"; !strings.Contains(got, link) {
+			t.Errorf("stdout %q lacks %q", got, link)
+		}
+	})
+	t.Run("locale without UTF-8", func(t *testing.T) {
+		f := &fake{stdin: "- item\n"}
+		e := f.env()
+		e.getenv = func(k string) string {
+			switch k {
+			case "LANG", "LC_ALL", "LC_CTYPE":
+				return "C"
+			}
+			return ""
+		}
+		if code := run(nil, e); code != 0 {
+			t.Fatalf("exit %d", code)
+		}
+		if got := f.stdout.String(); got != "• item\n" {
+			t.Errorf("got %q, want %q", got, "• item\n")
+		}
+	})
+}
+
 func TestVersion(t *testing.T) {
 	path := writeFile(t, "# From file\n")
 	for _, args := range [][]string{{"--version"}, {"--version", path}} {

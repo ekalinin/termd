@@ -576,19 +576,19 @@ func (f dateFormat) parse(s string) (time.Time, bool) {
 }
 
 // renderGantt draws a mermaid gantt chart as bars on a time axis.
-func renderGantt(src string, width int) (string, error) {
+func renderGantt(src string, width int, g *glyphs) (string, error) {
 	c, err := parseGantt(src)
 	if err != nil {
 		return "", err
 	}
-	return c.layout(width), nil
+	return c.layout(width, g), nil
 }
 
 // layout draws the chart for an output width: the title, the axis, and the
 // tasks under their sections with their bars. The bars get at least 20
 // columns; names wrap, splitting long words, so that every bar starts in
 // the same column.
-func (c *ganttChart) layout(width int) string {
+func (c *ganttChart) layout(width int, g *glyphs) string {
 	var drawn []*ganttTask
 	var start, end time.Time
 	names := 0
@@ -645,7 +645,7 @@ func (c *ganttChart) layout(width int) string {
 		for i, l := range text.Wrap([]text.Span{{Text: t.name}}, names-indent(t), true) {
 			line := pad + l.String()
 			if i == 0 {
-				line += strings.Repeat(" ", max(names-text.Width(line), 0)+2) + c.bar(t, col, bars)
+				line += strings.Repeat(" ", max(names-text.Width(line), 0)+2) + c.bar(t, col, bars, g)
 			}
 			out = append(out, strings.TrimRight(line, " "))
 		}
@@ -663,20 +663,20 @@ func indent(t *ganttTask) int {
 
 // bar returns the cells of the bar of t, with col mapping an instant to a
 // column of the bars bars columns wide.
-func (c *ganttChart) bar(t *ganttTask, col func(time.Time) int, bars int) string {
+func (c *ganttChart) bar(t *ganttTask, col func(time.Time) int, bars int, g *glyphs) string {
 	if t.milestone {
 		end := t.end
 		if end.Before(t.start) {
 			end = t.start
 		}
-		return strings.Repeat(" ", min(col(t.start.Add(end.Sub(t.start)/2)), bars-1)) + "◆"
+		return strings.Repeat(" ", min(col(t.start.Add(end.Sub(t.start)/2)), bars-1)) + g.milestone
 	}
-	fill := "█"
+	fill := g.bar
 	switch {
 	case t.active:
-		fill = "▓"
+		fill = g.active
 	case t.done:
-		fill = "░"
+		fill = g.done
 	}
 	from := min(col(t.start), bars-1)
 	to := from

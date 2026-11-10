@@ -6,34 +6,32 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	mdiagram "github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 )
 
 // errNotSupported is the reason of a PlantUML type that termd does not draw.
 var errNotSupported = errors.New("not supported")
 
 // renderPlantUML draws a PlantUML block of the type typ.
-func renderPlantUML(typ, src string, width int) (string, error) {
+func renderPlantUML(typ, src string, width int, g *glyphs) (string, error) {
 	switch typ {
 	case "sequence":
 		m, err := translateSequence(src)
 		if err != nil {
 			return "", err
 		}
-		return safeRender(m, mdiagram.DefaultConfig())
+		return safeRender(m, g.config())
 	case "mindmap":
 		title, root, err := parsePlantMindmap(src)
 		if err != nil {
 			return "", err
 		}
-		return drawTree(title, root, width), nil
+		return drawTree(title, root, width, g), nil
 	case "state":
 		d, err := parsePlantState(src)
 		if err != nil {
 			return "", err
 		}
-		return d.draw(width)
+		return d.draw(width, g)
 	}
 	return "", errNotSupported
 }

@@ -108,18 +108,69 @@ func blockWidth(s string) int {
 	return w
 }
 
+// glyphs are the characters that termd draws in diagrams itself, around
+// the output of mermaid-ascii.
+type glyphs struct {
+	// ascii selects the ASCII mode of mermaid-ascii and of breakLinks.
+	ascii bool
+	// The corners and the lines of a frame.
+	topLeft, topRight, bottomLeft, bottomRight, horizontal, vertical string
+	// branch and last start a node of a mindmap, guide continues the line
+	// of an ancestor with a later sibling.
+	branch, last, guide string
+	// The cells of the bar of a task, an active task and a done task, and
+	// of a milestone.
+	bar, active, done, milestone string
+	// symbols are the texts of the states drawn as a symbol, and region is
+	// the character of the line between concurrent regions.
+	symbols map[stateKind]string
+	region  string
+}
+
+var unicodeGlyphs = glyphs{
+	topLeft: "┌", topRight: "┐", bottomLeft: "└", bottomRight: "┘", horizontal: "─", vertical: "│",
+	branch: "├── ", last: "└── ", guide: "│   ",
+	bar: "█", active: "▓", done: "░", milestone: "◆",
+	symbols: symbols, region: "┈",
+}
+
+var asciiGlyphs = glyphs{
+	ascii:   true,
+	topLeft: "+", topRight: "+", bottomLeft: "+", bottomRight: "+", horizontal: "-", vertical: "|",
+	branch: "|-- ", last: "`-- ", guide: "|   ",
+	bar: "#", active: "=", done: "-", milestone: "*",
+	symbols: map[stateKind]string{stateStart: "*", stateEnd: "(*)", stateChoice: "<>", stateBar: "==="}, region: ".",
+}
+
+// config returns the mermaid-ascii configuration for g.
+func (g *glyphs) config() *mdiagram.Config {
+	cfg := mdiagram.DefaultConfig()
+	cfg.UseAscii = g.ascii
+	return cfg
+}
+
 // Render draws a diagram block for an output width. Supported mermaid
 // diagrams are drawn as text; everything else is shown as framed source.
 func Render(lang, src string, width int) Result {
+	return render(lang, src, width, &unicodeGlyphs)
+}
+
+// RenderASCII is Render with ASCII characters only, apart from the text of
+// the source.
+func RenderASCII(lang, src string, width int) Result {
+	return render(lang, src, width, &asciiGlyphs)
+}
+
+func render(lang, src string, width int, g *glyphs) Result {
 	src = strings.TrimRight(src, "\n")
 	if lang != "mermaid" {
 		typ := plantumlType(src)
-		out, err := renderPlantUML(typ, src, width)
+		out, err := renderPlantUML(typ, src, width, g)
 		switch {
 		case typ == "":
-			return fallback(src, width, lang, "not supported")
+			return fallback(src, width, g, lang, "not supported")
 		case err != nil:
-			return fallback(src, width, lang, typ, reason(err))
+			return fallback(src, width, g, lang, typ, reason(err))
 		}
 		return result(out, width)
 	}
@@ -128,22 +179,22 @@ func Render(lang, src string, width int) Result {
 	var err error
 	switch typ {
 	case "sequenceDiagram", "erDiagram":
-		out, err = safeRender(src, mdiagram.DefaultConfig())
+		out, err = safeRender(src, g.config())
 	case "flowchart", "graph":
-		out, err = renderFlowchart(src, width)
+		out, err = renderFlowchart(src, width, g)
 	case "stateDiagram", "stateDiagram-v2":
-		out, err = renderState(src, width)
+		out, err = renderState(src, width, g)
 	case "mindmap":
-		out, err = renderMindmap(src, width)
+		out, err = renderMindmap(src, width, g)
 	case "gantt":
-		out, err = renderGantt(src, width)
+		out, err = renderGantt(src, width, g)
 	case "":
-		return fallback(src, width, lang, "no diagram type")
+		return fallback(src, width, g, lang, "no diagram type")
 	default:
-		return fallback(src, width, lang, typ, "not supported")
+		return fallback(src, width, g, lang, typ, "not supported")
 	}
 	if err != nil {
-		return fallback(src, width, lang, typ, reason(err))
+		return fallback(src, width, g, lang, typ, reason(err))
 	}
 	return result(out, width)
 }
@@ -163,8 +214,8 @@ func result(out string, width int) Result {
 // renderFlowchart fits a flowchart into width: first with compacted spacing,
 // then, for a horizontal flowchart, laid out top-to-bottom. The narrower
 // result wins when neither fits.
-func renderFlowchart(src string, width int) (string, error) {
-	cfg := mdiagram.DefaultConfig()
+func renderFlowchart(src string, width int, g *glyphs) (string, error) {
+	cfg := g.config()
 	cfg.MaxWidth = width
 	out, err := safeRender(src, cfg)
 	if err != nil || blockWidth(out) <= width {
@@ -214,8 +265,8 @@ func reason(err error) string {
 
 // fallback shows src in a frame labelled with the language, the detected
 // type and the reason.
-func fallback(src string, width int, labelParts ...string) Result {
-	lines := Frame(strings.Join(labelParts, " - "), src)
+func fallback(src string, width int, g *glyphs, labelParts ...string) Result {
+	lines := frame(strings.Join(labelParts, " - "), src, g)
 	res := Result{Fallback: true, Lines: make([]text.Line, len(lines))}
 	for i, l := range lines {
 		res.Lines[i] = text.Plain(l)
@@ -226,16 +277,25 @@ func fallback(src string, width int, labelParts ...string) Result {
 
 // Frame draws src inside a box whose top border carries label.
 func Frame(label, src string) []string {
+	return frame(label, src, &unicodeGlyphs)
+}
+
+// FrameASCII is Frame with ASCII characters.
+func FrameASCII(label, src string) []string {
+	return frame(label, src, &asciiGlyphs)
+}
+
+func frame(label, src string, g *glyphs) []string {
 	body := strings.Split(strings.ReplaceAll(src, "\t", "    "), "\n")
 	inner := text.Width(label) + 1
 	for _, l := range body {
 		inner = max(inner, text.Width(l))
 	}
 	out := make([]string, 0, len(body)+2)
-	out = append(out, "┌─ "+label+" "+strings.Repeat("─", inner-text.Width(label)-1)+"┐")
+	out = append(out, g.topLeft+g.horizontal+" "+label+" "+strings.Repeat(g.horizontal, inner-text.Width(label)-1)+g.topRight)
 	for _, l := range body {
-		out = append(out, "│ "+l+strings.Repeat(" ", inner-text.Width(l))+" │")
+		out = append(out, g.vertical+" "+l+strings.Repeat(" ", inner-text.Width(l))+" "+g.vertical)
 	}
-	out = append(out, "└"+strings.Repeat("─", inner+2)+"┘")
+	out = append(out, g.bottomLeft+strings.Repeat(g.horizontal, inner+2)+g.bottomRight)
 	return out
 }

@@ -77,6 +77,7 @@ termd --version             # print the version
 | `--theme` | `auto` or a theme name | `TERMD_THEME`, or `auto` when it is not set | color theme, see [Themes](#themes); `auto` asks the terminal for its background color |
 | `--html` | `render`, `source` | `render` | HTML in the document: `render` interprets its tags, see [HTML](#html); `source` shows it as written |
 | `--base-url` | absolute URL | | base URL for relative links and images, see [Links](#links) |
+| `--ascii` | | off | draw tables, lines, markers and diagrams with ASCII characters only, see [ASCII mode](#ascii-mode) |
 | `--version` | | | print the version and exit |
 
 Exit status: `0` when the document was rendered (even if some diagrams were shown as source), `1` when the file cannot be read, `2` on a usage error.
@@ -128,6 +129,25 @@ A diagram type that is not supported yet:
 ### Output width and modes
 
 In a terminal, termd lays the document out for the terminal width and emits styles, colors and hyperlinks. When stdout is not a terminal, it uses 80 columns and emits plain text. `--width` overrides the width in both cases, and `--hyperlinks=always` forces hyperlinks into a pipe.
+
+### ASCII mode
+
+termd draws tables, quote markers, lines, list bullets, frames and diagrams with Unicode characters, also in plain mode. With `--ascii`, every character that termd draws itself is ASCII, in a terminal and in a pipe:
+
+| Element | Unicode | ASCII |
+|---|---|---|
+| table separators and rule | `│`, `─`, `┼` | `\|`, `-`, `+` |
+| quote and alert marker | `│` | `\|` |
+| thematic break and footnote line | `─` | `-` |
+| list bullet | `•` | `*` |
+| frame of diagram source and invalid frontmatter | `┌`, `─`, `┐`, `│`, `└`, `┘` | `+`, `-`, `\|` |
+| `details` marker | `▾` | `v` |
+| mindmap branches | `├──`, `│`, `└──` | `\|--`, `\|`, `` `-- `` |
+| gantt bars: task, active task, done task, milestone | `█`, `▓`, `░`, `◆` | `#`, `=`, `-`, `*` |
+| state diagram start, end, choice, fork and join | `●`, `◉`, `◇`, `━━━` | `*`, `(*)`, `<>`, `===` |
+| line between concurrent regions of a state | `┈` | `.` |
+
+Flowcharts, sequence diagrams, ER diagrams and the flowcharts of state diagrams are drawn by mermaid-ascii in its ASCII mode. In the text of a state, a `-` after a `-` and a `>` after a `-` or a `=` get a space before them instead of a look-alike character, so `a --> b` is shown as `a - - > b`. Styles, themes and hyperlinks do not change. The text of the document does not change: its non-ASCII characters, the emoji of shortcodes such as `:tada:`, the characters of references such as `&copy;` and the control pictures of control characters stay as they are. termd never turns the mode on by itself, also when the locale is not UTF-8.
 
 ### Control characters
 

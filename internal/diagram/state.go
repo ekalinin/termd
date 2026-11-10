@@ -296,32 +296,32 @@ func noteText(inline string, hasColon bool, lines []string, i int) (text string,
 }
 
 // renderState draws a mermaid state diagram.
-func renderState(src string, width int) (string, error) {
+func renderState(src string, width int, g *glyphs) (string, error) {
 	d, err := parseMermaidState(src)
 	if err != nil {
 		return "", err
 	}
-	return d.draw(width)
+	return d.draw(width, g)
 }
 
 // draw draws the diagram for an output width: the title, the top diagram,
 // and a section for every composite state with states inside it.
-func (d *stateDiagram) draw(width int) (string, error) {
+func (d *stateDiagram) draw(width int, g *glyphs) (string, error) {
 	var out []string
 	if d.title != "" {
 		out = append(out, d.title, "")
 	}
-	out, err := d.section(out, d.root, width)
+	out, err := d.section(out, d.root, width, g)
 	return strings.Join(out, "\n"), err
 }
 
 // section appends to out the diagrams of the regions of s with their notes,
 // under the text of s unless s is the root, and then the sections of the
 // composite states inside s.
-func (d *stateDiagram) section(out []string, s *state, width int) ([]string, error) {
+func (d *stateDiagram) section(out []string, s *state, width int, g *glyphs) ([]string, error) {
 	if s != d.root {
 		out = append(out, "")
-		out = append(out, wrapHanging(stateText(s), width)...)
+		out = append(out, wrapHanging(stateText(s, g), width)...)
 		out = append(out, "")
 	}
 	var parts [][]string
@@ -330,16 +330,16 @@ func (d *stateDiagram) section(out []string, s *state, width int) ([]string, err
 		if r.empty() {
 			continue
 		}
-		fc, err := renderFlowchart(d.flowchart(r), width)
+		fc, err := renderFlowchart(d.flowchart(r, g), width, g)
 		if err != nil {
 			return nil, err
 		}
 		widest = max(widest, blockWidth(fc))
-		parts = append(parts, append(strings.Split(fc, "\n"), d.noteLines(r, width)...))
+		parts = append(parts, append(strings.Split(fc, "\n"), d.noteLines(r, width, g)...))
 	}
 	for i, p := range parts {
 		if i > 0 {
-			out = append(out, "", strings.Repeat("┈", widest), "")
+			out = append(out, "", strings.Repeat(g.region, widest), "")
 		}
 		out = append(out, p...)
 	}
@@ -347,7 +347,7 @@ func (d *stateDiagram) section(out []string, s *state, width int) ([]string, err
 		for _, c := range r.states {
 			if c.hasInside() {
 				var err error
-				if out, err = d.section(out, c, width); err != nil {
+				if out, err = d.section(out, c, width, g); err != nil {
 					return nil, err
 				}
 			}
@@ -404,7 +404,7 @@ func innermost(t *transition) (*region, *state, *state) {
 }
 
 // noteLines returns the notes of the diagram of r, after a blank line.
-func (d *stateDiagram) noteLines(r *region, width int) []string {
+func (d *stateDiagram) noteLines(r *region, width int, g *glyphs) []string {
 	var out []string
 	for _, n := range d.notes {
 		var prefix string
@@ -412,12 +412,12 @@ func (d *stateDiagram) noteLines(r *region, width int) []string {
 			if n.of.parent != r {
 				continue
 			}
-			prefix = stateText(n.of)
+			prefix = stateText(n.of, g)
 		} else {
 			if in, _, _ := innermost(n.link); in != r {
 				continue
 			}
-			prefix = stateText(n.link.from) + " --> " + stateText(n.link.to)
+			prefix = stateText(n.link.from, g) + " --> " + stateText(n.link.to, g)
 		}
 		if len(out) == 0 {
 			out = append(out, "")
@@ -428,8 +428,8 @@ func (d *stateDiagram) noteLines(r *region, width int) []string {
 }
 
 // stateText returns the text of a state on one line.
-func stateText(s *state) string {
-	return strings.Join(strings.Fields(brRE.ReplaceAllString(strings.Join(nodeLines(s), " "), " ")), " ")
+func stateText(s *state, g *glyphs) string {
+	return strings.Join(strings.Fields(brRE.ReplaceAllString(strings.Join(nodeLines(s, g), " "), " ")), " ")
 }
 
 // wrapHanging wraps s at whitespace to width; the lines after the first
@@ -455,7 +455,7 @@ func wrapHanging(s string, width int) []string {
 // its states and its end, and an edge for every transition of which this is
 // the innermost region. Nodes get generated ids, so that no state id is read
 // as flowchart syntax.
-func (d *stateDiagram) flowchart(r *region) string {
+func (d *stateDiagram) flowchart(r *region, g *glyphs) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "flowchart %s\n", d.direction(r))
 	ids := map[*state]string{}
@@ -464,7 +464,7 @@ func (d *stateDiagram) flowchart(r *region) string {
 			return
 		}
 		ids[s] = fmt.Sprintf("n%d", len(ids)+1)
-		fmt.Fprintf(&b, "    %s[\"%s\"]\n", ids[s], breakLinks(strings.Join(nodeLines(s), "<br>")))
+		fmt.Fprintf(&b, "    %s[\"%s\"]\n", ids[s], breakLinks(strings.Join(nodeLines(s, g), "<br>"), g.ascii))
 	}
 	node(r.start)
 	for _, s := range r.states {
@@ -505,8 +505,8 @@ var symbols = map[stateKind]string{stateStart: "●", stateEnd: "◉", stateChoi
 
 // nodeLines returns the lines of the text of a state: its symbol, the lines
 // of its description, or its id.
-func nodeLines(s *state) []string {
-	if sym, ok := symbols[s.kind]; ok {
+func nodeLines(s *state, g *glyphs) []string {
+	if sym, ok := g.symbols[s.kind]; ok {
 		return []string{sym}
 	}
 	if len(s.desc) > 0 {
@@ -518,17 +518,22 @@ func nodeLines(s *state) []string {
 // breakLinks replaces the characters of flowchart links in a node text with
 // look-alikes of the same width: a - after a - with a non-breaking hyphen,
 // and a > after a - or a = with a single right-pointing angle quotation
-// mark.
-func breakLinks(s string) string {
+// mark. In ASCII mode the characters are kept with a space before them.
+func breakLinks(s string, ascii bool) string {
 	r := []rune(s)
-	out := slices.Clone(r)
-	for i := 1; i < len(r); i++ {
+	var b strings.Builder
+	for i, c := range r {
+		link := i > 0 && (c == '-' && r[i-1] == '-' || c == '>' && (r[i-1] == '-' || r[i-1] == '='))
 		switch {
-		case r[i] == '-' && r[i-1] == '-':
-			out[i] = '‑'
-		case r[i] == '>' && (r[i-1] == '-' || r[i-1] == '='):
-			out[i] = '›'
+		case !link:
+			b.WriteRune(c)
+		case ascii:
+			b.WriteString(" " + string(c))
+		case c == '-':
+			b.WriteRune('‑')
+		default:
+			b.WriteRune('›')
 		}
 	}
-	return string(out)
+	return b.String()
 }

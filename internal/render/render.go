@@ -45,6 +45,10 @@ type Options struct {
 	// HTMLSource shows HTML blocks and inline HTML as their source instead
 	// of interpreting their tags.
 	HTMLSource bool
+	// ASCII draws the characters that termd adds to the document, such as
+	// bullets, quote markers, lines, table borders and diagrams, with ASCII
+	// characters only.
+	ASCII bool
 }
 
 // Block is a rendered block: its lines and whether it is wider than the
@@ -72,7 +76,7 @@ func Render(src []byte, opts Options) string {
 	fm, body := splitFrontmatter(cleanSource(src))
 	r := &renderer{src: body, opts: opts, pal: opts.palette()}
 	var blocks []Block
-	if b, ok := frontmatterBlock(fm, opts.Width, r.pal); ok {
+	if b, ok := frontmatterBlock(fm, opts.Width, r.pal, opts.ASCII); ok {
 		blocks = append(blocks, b)
 	}
 	lines := join(append(blocks, r.blocks(Parse(body), opts.Width)...), true)
@@ -119,6 +123,25 @@ type renderer struct {
 	// refs collects the URLs of the links in the cells of a table when
 	// hyperlinks are disabled; it is nil outside tables.
 	refs *linkRefs
+}
+
+// marks are the characters that termd draws around the text of a
+// document.
+type marks struct {
+	bullet, quote, rule, details string
+}
+
+var (
+	unicodeMarks = marks{bullet: "•", quote: "│", rule: "─", details: "▾"}
+	asciiMarks   = marks{bullet: "*", quote: "|", rule: "-", details: "v"}
+)
+
+// marks returns the marks of the options: ASCII ones in ASCII mode.
+func (o Options) marks() marks {
+	if o.ASCII {
+		return asciiMarks
+	}
+	return unicodeMarks
 }
 
 // palette returns the palette of the options, theme.Default for a zero one.
@@ -180,7 +203,7 @@ func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 	case *ast.Paragraph, *ast.TextBlock:
 		return Block{Lines: text.Wrap(r.inlines(n, style.Style{}), width, true)}, true
 	case *ast.ThematicBreak:
-		return rule(width, r.pal.Marker), true
+		return rule(width, r.opts.marks().rule, r.pal.Marker), true
 	case *ast.FencedCodeBlock:
 		info := ""
 		if n.Info != nil {
@@ -209,9 +232,10 @@ func (r *renderer) block(n ast.Node, width int) (Block, bool) {
 	return Block{}, false
 }
 
-// rule is the horizontal line of a thematic break in the marker style ms.
-func rule(width int, ms style.Style) Block {
-	return Block{Lines: []text.Line{{{Text: strings.Repeat("─", width), Style: ms}}}}
+// rule is the horizontal line of a thematic break, drawn with the
+// character line in the marker style ms.
+func rule(width int, line string, ms style.Style) Block {
+	return Block{Lines: []text.Line{{{Text: strings.Repeat(line, width), Style: ms}}}}
 }
 
 func anyWide(blocks []Block) bool {
@@ -259,7 +283,11 @@ func verbatim(s string, width int) Block {
 func (r *renderer) code(src, info string, width int) Block {
 	code := strings.TrimSuffix(src, "\n")
 	if lang, ok := diagram.Language(info); ok {
-		res := diagram.Render(lang, code, width)
+		draw := diagram.Render
+		if r.opts.ASCII {
+			draw = diagram.RenderASCII
+		}
+		res := draw(lang, code, width)
 		return Block{Lines: res.Lines, Wide: res.Wide}
 	}
 	if r.opts.Style.Styled && highlight.Recognized(info) {
@@ -284,7 +312,7 @@ func (r *renderer) list(n *ast.List, width int) Block {
 			markers = append(markers, strconv.Itoa(num)+string(n.Marker))
 			num++
 		} else {
-			markers = append(markers, "•")
+			markers = append(markers, r.opts.marks().bullet)
 		}
 	}
 	return r.items(n, markers, n.IsTight, width)
@@ -380,7 +408,7 @@ func (r *renderer) alert(n *ast.Blockquote) (alertType, []text.Span, bool) {
 // quote marker have the color of the alert.
 func (r *renderer) quote(n *ast.Blockquote, width int) Block {
 	children := r.blocks(n, width-2)
-	ms := r.pal.Marker
+	ms, quote := r.pal.Marker, r.opts.marks().quote
 	if a, rest, ok := r.alert(n); ok {
 		ms = a.color(r.pal)
 		spans := []text.Span{{Text: a.title, Style: style.Layer(ms, style.Style{Bold: true})}}
@@ -392,10 +420,10 @@ func (r *renderer) quote(n *ast.Blockquote, width int) Block {
 	b := Block{Wide: anyWide(children)}
 	for _, l := range join(children, true) {
 		if len(l) == 0 {
-			b.Lines = append(b.Lines, text.Line{{Text: "│", Style: ms}})
+			b.Lines = append(b.Lines, text.Line{{Text: quote, Style: ms}})
 			continue
 		}
-		b.Lines = append(b.Lines, l.Prepend(text.Span{Text: "│ ", Style: ms}))
+		b.Lines = append(b.Lines, l.Prepend(text.Span{Text: quote + " ", Style: ms}))
 	}
 	return b
 }
@@ -403,7 +431,7 @@ func (r *renderer) quote(n *ast.Blockquote, width int) Block {
 // table converts a GFM table node and lays it out. Without hyperlinks, the
 // URLs of the links in its cells are listed below it after a blank line.
 func (r *renderer) table(n *east.Table, width int) Block {
-	t := table.Table{HeaderStyle: r.pal.TableHeader, BorderStyle: r.pal.TableBorder}
+	t := table.Table{HeaderStyle: r.pal.TableHeader, BorderStyle: r.pal.TableBorder, ASCII: r.opts.ASCII}
 	for _, a := range n.Alignments {
 		switch a {
 		case east.AlignLeft:
@@ -462,7 +490,7 @@ func (r *renderer) footnotes(n *east.FootnoteList, width int) Block {
 		tight = tight && blocks <= 1
 	}
 	list := r.items(n, markers, tight, width)
-	return Block{Lines: join([]Block{rule(width, r.pal.Marker), list}, true), Wide: list.Wide}
+	return Block{Lines: join([]Block{rule(width, r.opts.marks().rule, r.pal.Marker), list}, true), Wide: list.Wide}
 }
 
 // definitions renders a definition list: every term on its own line in bold,

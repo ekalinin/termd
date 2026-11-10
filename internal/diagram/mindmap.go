@@ -31,22 +31,22 @@ var (
 
 // renderMindmap draws a mermaid mindmap as an indented tree, with the title
 // of its frontmatter above it.
-func renderMindmap(src string, width int) (string, error) {
+func renderMindmap(src string, width int, g *glyphs) (string, error) {
 	title, root, err := parseMindmap(src)
 	if err != nil {
 		return "", err
 	}
-	return drawTree(title, root, width), nil
+	return drawTree(title, root, width, g), nil
 }
 
 // drawTree draws a mindmap tree for an output width, with its title, if
 // any, and a blank line above it.
-func drawTree(title string, root *mindNode, width int) string {
+func drawTree(title string, root *mindNode, width int, g *glyphs) string {
 	var out []string
 	if title != "" {
 		out = append(out, title, "")
 	}
-	out = root.layout(out, "", "", 0, width)
+	out = root.layout(out, "", "", 0, width, g)
 	return strings.Join(out, "\n")
 }
 
@@ -55,7 +55,7 @@ func drawTree(title string, root *mindNode, width int) string {
 // children. The text of a node at depth d wraps at the width minus the 4
 // columns of every level, but never at less than 10 columns, and words are
 // never split.
-func (n *mindNode) layout(out []string, prefix, guides string, depth, width int) []string {
+func (n *mindNode) layout(out []string, prefix, guides string, depth, width int, g *glyphs) []string {
 	first := true
 	for _, part := range n.text {
 		for _, l := range text.Wrap([]text.Span{{Text: part}}, max(width-4*depth, 10), false) {
@@ -67,11 +67,11 @@ func (n *mindNode) layout(out []string, prefix, guides string, depth, width int)
 		}
 	}
 	for i, c := range n.children {
-		conn, g := "├── ", "│   "
+		conn, guide := g.branch, g.guide
 		if i == len(n.children)-1 {
-			conn, g = "└── ", "    "
+			conn, guide = g.last, "    "
 		}
-		out = c.layout(out, guides+conn, guides+g, depth+1, width)
+		out = c.layout(out, guides+conn, guides+guide, depth+1, width, g)
 	}
 	return out
 }

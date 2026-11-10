@@ -1014,3 +1014,118 @@ func TestGanttWidth(t *testing.T) {
 		}
 	})
 }
+
+// foreign returns the non-ASCII characters of out that src does not contain,
+// each once.
+func foreign(out, src string) string {
+	var b strings.Builder
+	for _, r := range out {
+		if r > 127 && !strings.ContainsRune(src, r) && !strings.ContainsRune(b.String(), r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// drawnASCII is drawn in ASCII mode.
+func drawnASCII(t *testing.T, lang, src string, width int) string {
+	t.Helper()
+	res := RenderASCII(lang, src, width)
+	if res.Fallback {
+		t.Fatalf("fell back to source:\n%s", lines(res))
+	}
+	return strings.TrimSuffix(lines(res), "\n")
+}
+
+func TestASCIIMode(t *testing.T) {
+	state := func(lines ...string) string { return "stateDiagram-v2\n    " + strings.Join(lines, "\n    ") }
+	flow := func(lines ...string) string { return "flowchart " + strings.Join(lines, "\n    ") }
+
+	for _, src := range []string{"flowchart TD\n    A --> B", "sequenceDiagram\n    Alice->>Bob: Hi"} {
+		got := strings.Split(drawnASCII(t, "mermaid", src, 80), "\n")
+		if f := foreign(strings.Join(got, "\n"), ""); f != "" {
+			t.Errorf("%q: non-ASCII characters %q", src, f)
+		}
+		want := strings.Split(drawn(t, "mermaid", src, 80), "\n")
+		if len(got) != len(want) {
+			t.Errorf("%q: %d lines, want %d", src, len(got), len(want))
+			continue
+		}
+		for i := range want {
+			if text.Width(got[i]) != text.Width(want[i]) {
+				t.Errorf("%q: line %d is %q, want the width of %q", src, i, got[i], want[i])
+			}
+		}
+	}
+	if got := drawnASCII(t, "mermaid", "flowchart TD\n    A --> B", 80); !strings.Contains(got, "+---+") || !strings.Contains(got, "| A |") {
+		t.Errorf("boxes are not drawn with +, - and |:\n%s", got)
+	}
+
+	t.Run("state symbols", func(t *testing.T) {
+		got := drawnASCII(t, "mermaid", state("state c <<choice>>", "state f [[fork]]", "state j <<join>>", "[*] --> c", "c --> f : ok", "f --> j", "j --> [*]"), 80)
+		want := drawnASCII(t, "mermaid", flow("TB", `s["*"]`, `c["<>"]`, `f["==="]`, `j["==="]`, `e["(*)"]`, "s --> c", "c -->|ok| f", "f --> j", "j --> e"), 80)
+		if got != want {
+			t.Errorf("got\n%s\nwant\n%s", got, want)
+		}
+	})
+	t.Run("concurrent regions", func(t *testing.T) {
+		got := drawnASCII(t, "mermaid", state("[*] --> Active", "state Active {", "[*] --> A", "--", "[*] --> B", "}"), 80)
+		top := drawnASCII(t, "mermaid", flow("TB", `s["*"]`, `a["Active"]`, "s --> a"), 80)
+		a := drawnASCII(t, "mermaid", flow("TB", `s["*"]`, `a["A"]`, "s --> a"), 80)
+		b := drawnASCII(t, "mermaid", flow("TB", `s["*"]`, `b["B"]`, "s --> b"), 80)
+		divider := strings.Repeat(".", max(blockWidth(a), blockWidth(b)))
+		if want := top + "\n\nActive\n\n" + a + "\n\n" + divider + "\n\n" + b; got != want {
+			t.Errorf("got\n%s\nwant\n%s", got, want)
+		}
+	})
+	t.Run("links in the text of a state", func(t *testing.T) {
+		if got := drawnASCII(t, "mermaid", state(`state "a --> b" as T`, "[*] --> T"), 80); !strings.Contains(got, "| a - - > b |") {
+			t.Errorf("output lacks a - - > b:\n%s", got)
+		}
+	})
+	t.Run("mindmap", func(t *testing.T) {
+		got := drawnASCII(t, "mermaid", "mindmap\n  root((Plan))\n    Goals\n      Faster\n      Simpler\n    Risks", 80)
+		if want := "Plan\n|-- Goals\n|   |-- Faster\n|   `-- Simpler\n`-- Risks"; got != want {
+			t.Errorf("got\n%s\nwant\n%s", got, want)
+		}
+	})
+	t.Run("gantt", func(t *testing.T) {
+		src := "gantt\n  Design :done, d, 2024-01-01, 10d\n  Build :active, b, after d, 10d\n  Test :t, after b, 10d\n  Release :milestone, after t, 0d"
+		got := drawnASCII(t, "mermaid", src, 40)
+		if want := strings.NewReplacer("░", "-", "▓", "=", "█", "#", "◆", "*").Replace(drawn(t, "mermaid", src, 40)); got != want {
+			t.Errorf("got\n%s\nwant\n%s", got, want)
+		}
+		l := strings.Split(got, "\n")
+		if len(l) != 5 || !strings.HasSuffix(l[1], "--------") || !strings.HasSuffix(l[2], "=======") ||
+			!strings.HasSuffix(l[3], "#######") || strings.Count(l[4], "*") != 1 {
+			t.Errorf("bars:\n%s", got)
+		}
+	})
+	t.Run("framed source", func(t *testing.T) {
+		src := "classDiagram\n    class User"
+		want := []string{
+			"+- mermaid - classDiagram - not supported +",
+			"| classDiagram                            |",
+			"|     class User                          |",
+			"+" + strings.Repeat("-", 41) + "+",
+		}
+		if got := FrameASCII("mermaid - classDiagram - not supported", src); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("FrameASCII:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+		}
+		if res := RenderASCII("mermaid", src, 80); !res.Fallback || lines(res) != strings.Join(want, "\n")+"\n" {
+			t.Errorf("RenderASCII:\n%s", lines(res))
+		}
+	})
+	t.Run("text of the diagram", func(t *testing.T) {
+		got := drawnASCII(t, "mermaid", "flowchart TD\n    A[Café] --> B", 80)
+		if !strings.Contains(got, "Café") || foreign(got, "é") != "" {
+			t.Errorf("got\n%s", got)
+		}
+	})
+	for _, name := range []string{"plantuml-seq.puml", "plantuml-mindmap.puml", "plantuml-state.puml"} {
+		src := readFixture(t, name)
+		if f := foreign(drawnASCII(t, "plantuml", src, 80), src); f != "" {
+			t.Errorf("%s: non-ASCII characters %q", name, f)
+		}
+	}
+}

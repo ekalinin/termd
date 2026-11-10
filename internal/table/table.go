@@ -34,6 +34,8 @@ type Table struct {
 	HeaderStyle style.Style
 	// BorderStyle styles the column separators and the rule under the header.
 	BorderStyle style.Style
+	// ASCII draws the separators and the rule with ASCII characters.
+	ASCII bool
 }
 
 const (
@@ -41,6 +43,15 @@ const (
 	sepWidth = 3
 	ruleSep  = "─┼─"
 )
+
+// borders returns the column separator, the separator in the rule under the
+// header and the character of the rule.
+func (t Table) borders() (colSep, ruleColSep, rule string) {
+	if t.ASCII {
+		return " | ", "-+-", "-"
+	}
+	return sep, ruleSep, "─"
+}
 
 // cell returns cell i of row, or an empty cell for missing ones.
 func cell(row []Cell, i int) Cell {
@@ -175,11 +186,12 @@ func (t Table) Render(width int) (lines []text.Line, wide bool) {
 		}
 		lines = append(lines, t.row(header, widths)...)
 
+		_, ruleColSep, ruleChar := t.borders()
 		parts := make([]string, len(widths))
 		for i, w := range widths {
-			parts[i] = strings.Repeat("─", w)
+			parts[i] = strings.Repeat(ruleChar, w)
 		}
-		rule := text.Plain(strings.Join(parts, ruleSep))
+		rule := text.Plain(strings.Join(parts, ruleColSep))
 		for i := range rule {
 			rule[i].Style = t.BorderStyle
 		}
@@ -201,12 +213,13 @@ func (t Table) row(row []Cell, widths []int) []text.Line {
 		wrapped[i] = text.Wrap(cell(row, i), w, false)
 		height = max(height, len(wrapped[i]))
 	}
+	colSep, _, _ := t.borders()
 	lines := make([]text.Line, height)
 	for j := range height {
 		var l text.Line
 		for i, w := range widths {
 			if i > 0 {
-				l = append(l, text.Span{Text: sep, Style: t.BorderStyle})
+				l = append(l, text.Span{Text: colSep, Style: t.BorderStyle})
 			}
 			var part text.Line
 			if j < len(wrapped[i]) {

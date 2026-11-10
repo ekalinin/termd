@@ -323,7 +323,7 @@ func (b *htmlBlocks) closeDetails() {
 	for i, l := range text.Wrap(summary, w, true) {
 		switch {
 		case i == 0:
-			l = l.Prepend(text.Span{Text: "▾ ", Style: b.r.pal.Marker})
+			l = l.Prepend(text.Span{Text: b.r.opts.marks().details + " ", Style: b.r.pal.Marker})
 		case len(l) > 0:
 			l = l.Prepend(text.Span{Text: "  "})
 		}

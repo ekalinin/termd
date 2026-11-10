@@ -1,6 +1,7 @@
 package table
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -293,6 +294,38 @@ func TestZeroStyles(t *testing.T) {
 		for _, sp := range l {
 			if !sp.Style.IsZero() {
 				t.Errorf("span %q in %q has style %+v", sp.Text, l.String(), sp.Style)
+			}
+		}
+	}
+}
+
+func TestASCII(t *testing.T) {
+	tb := Table{Header: cells("A", "B"), Rows: [][]Cell{cells("1", "2")}, ASCII: true}
+	lines, _ := tb.Render(80)
+	if got, want := lineStrings(lines), []string{"A | B", "--+--", "1 | 2"}; !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// With wrapped cells, the separators are at the same columns and have
+	// the same style as in Unicode mode.
+	uni := paramsTable()
+	uni.BorderStyle = style.Style{FG: style.RGB(1, 2, 3)}
+	ascii := uni
+	ascii.ASCII = true
+	ul, _ := uni.Render(60)
+	al, _ := ascii.Render(60)
+	if len(al) != len(ul) || len(ul) < 4 {
+		t.Fatalf("got %d lines, want %d", len(al), len(ul))
+	}
+	toASCII := strings.NewReplacer("│", "|", "┼", "+", "─", "-")
+	for i := range ul {
+		if len(al[i]) != len(ul[i]) {
+			t.Errorf("line %d: %d spans, want %d", i, len(al[i]), len(ul[i]))
+			continue
+		}
+		for k := range ul[i] {
+			if want := toASCII.Replace(ul[i][k].Text); al[i][k].Text != want || al[i][k].Style != ul[i][k].Style {
+				t.Errorf("line %d span %d = %q %+v, want %q %+v", i, k, al[i][k].Text, al[i][k].Style, want, ul[i][k].Style)
 			}
 		}
 	}

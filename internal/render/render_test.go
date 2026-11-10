@@ -14,6 +14,7 @@ import (
 	east "github.com/yuin/goldmark/extension/ast"
 	"golang.org/x/net/html"
 
+	"github.com/ekalinin/termd/internal/diagram"
 	"github.com/ekalinin/termd/internal/highlight"
 	"github.com/ekalinin/termd/internal/style"
 	"github.com/ekalinin/termd/internal/text"
@@ -1006,7 +1007,7 @@ func TestInvalidFrontmatter(t *testing.T) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 	fm, _ := splitFrontmatter([]byte("---\ntitle: [unclosed\n---\n"))
-	if b, _ := frontmatterBlock(fm, 20, theme.Default); !b.Wide {
+	if b, _ := frontmatterBlock(fm, 20, theme.Default, false); !b.Wide {
 		t.Error("frame wider than the output is not marked wide")
 	}
 }
@@ -1560,6 +1561,60 @@ func TestPalette(t *testing.T) {
 		o.Palette = themed(t, "dracula").Palette
 		if Render(src, o) != Render(src, plain(80)) {
 			t.Error("plain output depends on the palette")
+		}
+	})
+}
+
+func TestASCIIMode(t *testing.T) {
+	ascii := func(o Options) Options {
+		o.ASCII = true
+		return o
+	}
+	tests := []struct {
+		name, src string
+		width     int
+		want      []string
+	}{
+		{"lists and quotes", "- a\n  - b\n\n> quoted\n", 40, []string{"* a", "  * b", "", "| quoted"}},
+		{"alert", "> [!NOTE]\n> Useful info.\n", 40, []string{"| Note", "| Useful info."}},
+		{"thematic break and footnotes", "Text[^1].\n\n---\n\n[^1]: Note.\n", 20,
+			[]string{"Text[1].", "", strings.Repeat("-", 20), "", strings.Repeat("-", 20), "", "1. Note."}},
+		{"details", "<details><summary>More</summary>text</details>\n", 40, []string{"v More", "  text"}},
+		{"invalid YAML frontmatter", "---\ntitle: [unclosed\n---\n", 40, diagram.FrameASCII("frontmatter - invalid YAML", "title: [unclosed")},
+		{"frontmatter table", "---\ntitle: Doc\n---\n", 40, []string{"title | Doc"}},
+		{"table", "A | B\n--|--\n1 | 2\n", 40, []string{"A | B", "--+--", "1 | 2"}},
+	}
+	for _, tt := range tests {
+		if got := renderLines(tt.src, ascii(plain(tt.width))); !slices.Equal(got, tt.want) {
+			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
+		}
+	}
+
+	t.Run("styles", func(t *testing.T) {
+		opts := themed(t, "dracula")
+		src := "> quoted\n\n- item\n"
+		got := Render([]byte(src), ascii(opts))
+		if want := strings.NewReplacer("│", "|", "•", "*").Replace(Render([]byte(src), opts)); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+		if marker := (text.Line{{Text: "| ", Style: opts.Palette.Marker}}).Render(opts.Style); !strings.Contains(got, marker) {
+			t.Errorf("output %q lacks the styled marker %q", got, marker)
+		}
+	})
+	t.Run("diagram", func(t *testing.T) {
+		src := "flowchart TD\n    A --> B"
+		var want []string
+		for _, l := range diagram.RenderASCII("mermaid", src, 40).Lines {
+			want = append(want, l.String())
+		}
+		if got := renderLines("```mermaid\n"+src+"\n```\n", ascii(plain(40))); !slices.Equal(got, want) {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+	t.Run("text of the document", func(t *testing.T) {
+		out := Render([]byte("Café :tada: &copy; a\x1bb\n"), ascii(plain(40)))
+		if !strings.Contains(out, "Café 🎉 ©") || !strings.Contains(out, "a␛b") {
+			t.Errorf("got %q", out)
 		}
 	})
 }

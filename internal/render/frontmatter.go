@@ -103,13 +103,18 @@ func parseFrontmatter(src string) (fm frontmatter) {
 
 // frontmatterBlock renders the frontmatter as the first block of the
 // document: a key-value table for a mapping, the source in a frame for
-// invalid YAML. The palette styles the keys and the column separator. ok
+// invalid YAML. The palette styles the keys and the column separator. In
+// ASCII mode the frame and the separator are drawn with ASCII characters. ok
 // is false when there is nothing to show.
-func frontmatterBlock(fm frontmatter, width int, pal theme.Palette) (b Block, ok bool) {
+func frontmatterBlock(fm frontmatter, width int, pal theme.Palette, ascii bool) (b Block, ok bool) {
 	switch fm.kind {
 	case fmTable:
 	case fmInvalid:
-		for _, l := range diagram.Frame("frontmatter - invalid YAML", strings.TrimSuffix(fm.src, "\n")) {
+		frame := diagram.Frame
+		if ascii {
+			frame = diagram.FrameASCII
+		}
+		for _, l := range frame("frontmatter - invalid YAML", strings.TrimSuffix(fm.src, "\n")) {
 			b.Lines = append(b.Lines, text.Plain(l))
 			b.Wide = b.Wide || text.Width(l) > width
 		}
@@ -118,7 +123,7 @@ func frontmatterBlock(fm frontmatter, width int, pal theme.Palette) (b Block, ok
 		return Block{}, false
 	}
 	cleanValues(fm.root)
-	t := table.Table{BorderStyle: pal.TableBorder}
+	t := table.Table{BorderStyle: pal.TableBorder, ASCII: ascii}
 	pairs := fm.root.Content
 	for i := 0; i+1 < len(pairs); i += 2 {
 		key := table.Cell{{Text: scalarOrFlow(pairs[i]), Style: pal.FrontmatterKey}}

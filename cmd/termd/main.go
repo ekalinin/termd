@@ -111,6 +111,7 @@ func run(args []string, e env) int {
 	themeFlag := fs.String("theme", "auto", "color theme: "+themeValues())
 	htmlMode := fs.String("html", "render", "HTML in the document: render or source")
 	baseURLFlag := fs.String("base-url", "", "base URL for relative links and images, such as https://github.com/o/r/blob/main/")
+	ascii := fs.Bool("ascii", false, "draw tables, lines, markers and diagrams with ASCII characters only")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = func() {
 		fmt.Fprint(e.stderr, usage)
@@ -200,6 +201,7 @@ func run(args []string, e env) int {
 		Dir:        docDir(file),
 		BaseURL:    baseURL,
 		HTMLSource: *htmlMode == "source",
+		ASCII:      *ascii,
 	}
 	// A file whose name the highlighter recognizes is shown as code; stdin is
 	// always markdown.
